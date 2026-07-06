@@ -1,0 +1,90 @@
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+
+CodeBrix.Develop.Debug.LinuxX64 is a NuGet package that carries linux-x64
+native binaries of the NetCoreDbg debugger. Everything in this package is a
+build of third-party open-source software, as detailed below. The package
+adds no original code beyond the packaging itself.
+
+If you have any questions about any third-party code referenced here, or if
+you believe that any third-party code has been included in
+CodeBrix.Develop.Debug.LinuxX64 in error, please open a new issue at:
+https://github.com/ellisnet/CodeBrix.Develop.Debug/issues
+
+================================================================================
+
+1. NetCoreDbg (the netcoredbg executable and ManagedPart.dll)
+
+   Project:   netcoredbg — Debugger for the .NET Core Runtime
+   Source:    https://github.com/Samsung/netcoredbg
+              (built from the fork at
+              https://github.com/ellisnet/CodeBrix.Develop.Debug,
+              release lineage 3.2.0)
+   Authors:   Samsung Electronics Co., LTD and the netcoredbg contributors
+   License:   MIT (full text reproduced below)
+
+   The `netcoredbg` executable additionally compiles in the following
+   third-party libraries vendored in the netcoredbg source tree:
+     - nlohmann/json (https://github.com/nlohmann/json) — MIT
+     - libelfin (https://github.com/aclements/libelfin) — MIT
+     - linenoise-ng (https://github.com/arangodb/linenoise-ng) — BSD-style
+   and includes portions derived from the .NET runtime sources
+   (https://github.com/dotnet/runtime) — MIT, (c) .NET Foundation and
+   Contributors.
+
+   MIT License
+
+   Copyright (c) 2017 Samsung Electronics Co., LTD
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+================================================================================
+
+2. libdbgshim.so
+
+   Project:   .NET diagnostics — dbgshim
+   Source:    https://github.com/dotnet/diagnostics
+              (distributed as the Microsoft.Diagnostics.DbgShim NuGet package,
+              downloaded by the netcoredbg build)
+   Authors:   Microsoft Corporation / .NET Foundation and Contributors
+   License:   MIT
+              https://github.com/dotnet/diagnostics/blob/main/LICENSE.TXT
+
+================================================================================
+
+3. Microsoft.CodeAnalysis.dll, Microsoft.CodeAnalysis.CSharp.dll,
+   Microsoft.CodeAnalysis.Scripting.dll,
+   Microsoft.CodeAnalysis.CSharp.Scripting.dll
+
+   Project:   Roslyn (the .NET Compiler Platform), 2.x-era scripting stack
+              used by NetCoreDbg's ManagedPart for expression evaluation
+   Source:    https://github.com/dotnet/roslyn
+   Authors:   Microsoft Corporation / .NET Foundation and Contributors
+   License:   Apache-2.0 (the license of the Roslyn 2.x releases these
+              binaries come from; later Roslyn releases are MIT)
+              https://www.apache.org/licenses/LICENSE-2.0
+
+================================================================================
+
+Jeremy Ellis and contributors license the CodeBrix.Develop.Debug packaging
+to you under the terms set forth in the LICENSE file at the root of the
+https://github.com/ellisnet/CodeBrix.Develop.Debug repository (MIT).
+
+================================================================================
+
+END OF THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
