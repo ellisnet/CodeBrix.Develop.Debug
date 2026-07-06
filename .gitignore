@@ -50,3 +50,4 @@ tags
 
 # netcoregdb's command history
 .netcoredbg_hist
+.claude/settings.local.json

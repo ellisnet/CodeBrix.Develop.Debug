@@ -1,0 +1,32 @@
+<Project>
+
+  <!--
+    Copies the NetCoreDbg debugger binaries into the consuming application's
+    output folder (netcoredbg/ subfolder) on every build - no
+    RuntimeIdentifier required - and restores the executable bit on the
+    netcoredbg binary, which the nupkg zip format cannot preserve. This
+    package is linux-arm64 only, so the chmod steps are gated on Unix hosts.
+  -->
+
+  <ItemGroup>
+    <_NetCoreDbgFile Include="$(MSBuildThisFileDirectory)..\tools\linux-arm64\**\*" />
+    <None Include="@(_NetCoreDbgFile)">
+      <Link>netcoredbg\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+  <Target Name="CodeBrixDevelopDebugRestoreExecutableBit"
+          AfterTargets="Build"
+          Condition="'$(OS)' == 'Unix' and Exists('$(OutputPath)netcoredbg/netcoredbg')">
+    <Exec Command="chmod +x '$(OutputPath)netcoredbg/netcoredbg'" />
+  </Target>
+
+  <Target Name="CodeBrixDevelopDebugRestoreExecutableBitOnPublish"
+          AfterTargets="Publish"
+          Condition="'$(OS)' == 'Unix' and Exists('$(PublishDir)netcoredbg/netcoredbg')">
+    <Exec Command="chmod +x '$(PublishDir)netcoredbg/netcoredbg'" />
+  </Target>
+
+</Project>

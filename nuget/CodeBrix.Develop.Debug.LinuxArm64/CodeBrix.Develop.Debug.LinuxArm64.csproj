@@ -1,0 +1,107 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Packaging-only project: produces the CodeBrix.Develop.Debug.LinuxArm64
+    NuGet package, which carries the linux-arm64 native build of the NetCoreDbg
+    debugger (built from this repository with cmake + clang; see the root
+    README.md for build instructions). The package contains no managed
+    library - just the debugger binaries under tools/linux-arm64/ and a
+    build/*.targets file that copies them into the consuming app's output
+    folder (netcoredbg/ subfolder) and restores the executable bit that the
+    nupkg zip format cannot preserve.
+
+    Build the debugger first (the packed files come from ../../bin/), then
+    pack this project. NOTE: ../../bin/ is a shared output folder - make sure
+    it holds the linux-arm64 build (built on an arm64 host) before packing
+    this package, not the linux-x64 build.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!--
+    Package / assembly version: date-stamped and auto-incrementing.
+
+    Format:  3.<x>.<y>.<z>   (every field is derived from UTC "now")
+
+      3  (major)     Always 3 for this library.
+      x  (minor)     Whole years since $(_VersionBaseYear).
+                     With base 2026: 2026=0, 2027=1, 2028=2, ...
+      y  (build)     Day of year, 1-based inclusive, UTC.
+                     Jan 1 = 1, Feb 1 = 32, Dec 31 = 365 (366 in a leap year).
+      z  (revision)  Minute of day, UTC, range 0 to 1439.
+                     00:00 = 0, 23:59 = 1439.
+
+    The version is always strictly increasing over time:
+      * within a day, z grows;
+      * at a day boundary, y increments and outranks z resetting to 0;
+      * at a (UTC) year boundary, x increments and outranks y and z resetting.
+
+    Notes / caveats:
+      * All fields read from System.DateTime.UtcNow, so a local dev build and a
+        UTC CI build agree on the value. Math.Floor on the minutes keeps z in
+        0..1439 (plain rounding could land on 1440 late in the day).
+      * Because the value depends on the clock, every build produces a NEW
+        version. With GeneratePackageOnBuild=true that means a fresh .nupkg on
+        each build, and two builds in the SAME UTC minute produce the SAME
+        version (so do not publish two packages from within one minute).
+      * This is date-stamp versioning, not SemVer: minor encodes the year and
+        major is pinned to 3 (matching the major version of the NetCoreDbg
+        debugger the package carries), so major/minor do not signal API
+        compatibility.
+      * To re-baseline the minor number, change _VersionBaseYear below.
+  -->
+  <PropertyGroup>
+    <_VersionBaseYear>2026</_VersionBaseYear>
+    <_VersionYears>$([MSBuild]::Subtract($([System.DateTime]::UtcNow.Year), $(_VersionBaseYear)))</_VersionYears>
+    <_VersionDayOfYear>$([System.DateTime]::UtcNow.DayOfYear)</_VersionDayOfYear>
+    <_VersionMinuteOfDay>$([System.Convert]::ToInt32($([System.Math]::Floor($([System.DateTime]::UtcNow.TimeOfDay.TotalMinutes)))))</_VersionMinuteOfDay>
+    <BuildVersion>3.$(_VersionYears).$(_VersionDayOfYear).$(_VersionMinuteOfDay)</BuildVersion>
+    <Version>$(BuildVersion)</Version>
+    <AssemblyVersion>$(BuildVersion)</AssemblyVersion>
+    <FileVersion>$(BuildVersion)</FileVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>CodeBrix.Develop.Debug.LinuxArm64</PackageId>
+    <Product>CodeBrix.Develop.Debug.LinuxArm64</Product>
+    <Title>CodeBrix.Develop.Debug.LinuxArm64</Title>
+    <Authors>Jeremy Ellis</Authors>
+    <Description>The NetCoreDbg debugger for the .NET runtime (GDB/MI and VSCode Debug Adapter Protocol), packaged as linux-arm64 native binaries. On build, the debugger is copied into the consuming application's output folder (netcoredbg/ subfolder), ready to be launched as a child process. Derived from the Samsung netcoredbg project.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ellisnet/CodeBrix.Develop.Debug</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ellisnet/CodeBrix.Develop.Debug</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageIcon>icon-codebrix-128.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Copyright>Copyright (c) 2026 Jeremy Ellis and contributors</Copyright>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <IsPackable>true</IsPackable>
+    <PackageTags>netcoredbg;debugger;debugging;dap;debug-adapter-protocol;gdb-mi;dotnet;linux;arm64;CodeBrix</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The linux-arm64 debugger binaries produced by this repository's cmake build ("make install" into ../../bin/). -->
+    <None Include="..\..\bin\netcoredbg" Pack="true" PackagePath="tools/linux-arm64" />
+    <None Include="..\..\bin\ManagedPart.dll" Pack="true" PackagePath="tools/linux-arm64" />
+    <None Include="..\..\bin\libdbgshim.so" Pack="true" PackagePath="tools/linux-arm64" />
+    <None Include="..\..\bin\Microsoft.CodeAnalysis.dll" Pack="true" PackagePath="tools/linux-arm64" />
+    <None Include="..\..\bin\Microsoft.CodeAnalysis.CSharp.dll" Pack="true" PackagePath="tools/linux-arm64" />
+    <None Include="..\..\bin\Microsoft.CodeAnalysis.Scripting.dll" Pack="true" PackagePath="tools/linux-arm64" />
+    <None Include="..\..\bin\Microsoft.CodeAnalysis.CSharp.Scripting.dll" Pack="true" PackagePath="tools/linux-arm64" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="build\CodeBrix.Develop.Debug.LinuxArm64.targets" Pack="true" PackagePath="build" />
+    <None Include="..\..\icon-codebrix-128.png" Pack="true" PackagePath="" />
+    <None Include="README.md" Pack="true" PackagePath="" />
+    <None Include="..\..\AGENT-README.txt" Pack="true" PackagePath="" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>
