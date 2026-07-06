@@ -12,7 +12,8 @@ CodeBrix.Develop.Debug is an EXACT FORK of the Samsung netcoredbg project
 child process and driven over stdio.
 
 This repository differs from upstream ONLY by the addition of:
-  - nuget/CodeBrix.Develop.Debug.LinuxX64/  (NuGet packaging project)
+  - nuget/CodeBrix.Develop.Debug.LinuxX64/    (NuGet packaging project)
+  - nuget/CodeBrix.Develop.Debug.LinuxArm64/  (NuGet packaging project)
   - the CodeBrix repo-standard files (this file, the AI-agent pointer
     stubs, THIRD-PARTY-NOTICES.txt, icon-codebrix-128.png)
 
@@ -21,14 +22,27 @@ keeping the fork exact is a deliberate policy so upstream releases can be
 merged cleanly.
 
 
-THE NUGET PACKAGE
------------------
-NuGet Package: CodeBrix.Develop.Debug.LinuxX64
-Platform: linux-x64 ONLY (a deliberate, user-chosen limitation)
-Contents: native debugger binaries under tools/linux-x64/ plus a
-build/*.targets file - NO managed library, NO NuGet dependencies.
+THE NUGET PACKAGES
+------------------
+This repository produces one single-arch package per supported Linux
+architecture - each a carrier for that arch's native debugger binaries,
+with NO managed library and NO NuGet dependencies:
 
-IMPORTANT: like other CodeBrix.Develop.* packages, the package id carries
+  - CodeBrix.Develop.Debug.LinuxX64    (linux-x64,   tools/linux-x64/)
+  - CodeBrix.Develop.Debug.LinuxArm64  (linux-arm64, tools/linux-arm64/)
+  - CodeBrix.Develop.Debug.LinuxRiscV64  (linux-riscv64 - planned, once the
+    RISC-V .NET toolchain matures; built on RVA23 hardware)
+
+Each package carries its arch's binaries under tools/linux-<arch>/ plus a
+build/*.targets file. The packages are deliberately kept as separate,
+single-arch carriers (not one multi-arch package): the targets file copies
+its binaries unconditionally, so a consumer references EXACTLY ONE package,
+selected by host/target architecture (e.g. via $(NETCoreSdkRuntimeIdentifier)
+in a conditional PackageReference). Every package lands its binaries at the
+SAME output path (netcoredbg/netcoredbg), so consuming code is arch-agnostic:
+    System.IO.Path.Combine(AppContext.BaseDirectory, "netcoredbg", "netcoredbg")
+
+IMPORTANT: like other CodeBrix.Develop.* packages, the package ids carry
 NO license-suffix. This is a deliberate, user-chosen deviation from the
 CodeBrix family convention.
 
@@ -53,8 +67,8 @@ Packaged files (produced by this repository's cmake build):
                                      ManagedPart
 
 
-BUILDING THE DEBUGGER (linux-x64)
----------------------------------
+BUILDING THE DEBUGGER
+---------------------
 Prerequisites: cmake, clang (gcc is NOT supported), make, .NET runtime.
 The cmake configure step auto-downloads the CoreCLR runtime sources and a
 .NET SDK on first run (large download).
@@ -65,22 +79,31 @@ The cmake configure step auto-downloads the CoreCLR runtime sources and a
     make -j$(nproc)
     make install
 
-The installed artifacts land in <repo-root>/bin/ - this is exactly the
-file set the NuGet packaging project packs.
+The build targets the architecture of the host it runs on: build on a
+linux-x64 host for the x64 binaries, on a linux-arm64 host (e.g. a
+Raspberry Pi 5) for the arm64 binaries - the commands are identical. The
+installed artifacts land in <repo-root>/bin/ - this is exactly the file set
+the NuGet packaging project packs.
+
+NOTE: <repo-root>/bin/ is a SHARED output folder. It holds whichever arch
+you last built, so pack the matching package immediately after building
+(don't pack the LinuxX64 package from a bin/ that holds an arm64 build).
 
 
 PACKING THE NUGET
 -----------------
-Build the debugger FIRST (the packaging project packs ../../bin/), then:
+Build the debugger FIRST (the packaging project packs ../../bin/), then
+pack the package that matches the arch currently in bin/:
 
-    cd nuget/CodeBrix.Develop.Debug.LinuxX64
+    cd nuget/CodeBrix.Develop.Debug.LinuxX64     # or .../LinuxArm64
     dotnet build -c Release
 
-The .nupkg lands in nuget/CodeBrix.Develop.Debug.LinuxX64/bin/Release/.
-Versioning uses the canonical CodeBrix date-stamped scheme with the MAJOR
-pinned to 3, matching the major version of the NetCoreDbg debugger the
-package carries (same pattern as CodeBrix.Platform.MediaPlayerCore's
-libvlc-pinned major).
+The .nupkg lands in that project's bin/Release/. Versioning uses the
+canonical CodeBrix date-stamped scheme with the MAJOR pinned to 3, matching
+the major version of the NetCoreDbg debugger the package carries (same
+pattern as CodeBrix.Platform.MediaPlayerCore's libvlc-pinned major). Each
+arch package is packed independently, so their date-stamped versions differ
+- that is expected.
 
 
 LICENSING
