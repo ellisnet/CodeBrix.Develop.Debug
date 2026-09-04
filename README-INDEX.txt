@@ -10,12 +10,10 @@ are changing this repository itself.
 AGENT-README FILES (consumer documentation, one per NuGet package)
 ------------------------------------------------------------------
   AGENT-README.txt
-      CodeBrix.Develop.Debug.LinuxX64 — the NetCoreDbg .NET debugger as
-      linux-x64 native binaries, copied into your app's output folder.
-  AGENT-README.txt
-      CodeBrix.Develop.Debug.LinuxArm64 — the same debugger as linux-arm64
-      native binaries. One file covers both packages; reference exactly one of
-      them, matching the architecture your application runs on.
+      CodeBrix.Develop.Debug.LinuxX64 and CodeBrix.Develop.Debug.LinuxArm64 —
+      the .NET debugger as linux-x64 / linux-arm64 native binaries, copied into
+      your app's output folder. ONE file covers both packages; reference
+      exactly one of them, matching the architecture your application runs on.
 
 MAINTAINER AND EXTRAS
 ---------------------
@@ -28,7 +26,14 @@ MAINTAINER AND EXTRAS
 GENERAL
 -------
   README.md
-      Human-facing overview shown on GitHub and nuget.org.
+      Human-facing overview shown on GitHub. It is NOT packed into either
+      nupkg — each package ships its own readme, listed below.
+  nuget/CodeBrix.Develop.Debug.LinuxX64/README.md
+      The nuget.org readme for CodeBrix.Develop.Debug.LinuxX64.
+  nuget/CodeBrix.Develop.Debug.LinuxArm64/README.md
+      The nuget.org readme for CodeBrix.Develop.Debug.LinuxArm64.
+  THIRD-PARTY-NOTICES.txt
+      What came from where, and under which licences.
   README-INDEX.txt
       This file.
 ================================================================================

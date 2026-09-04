@@ -28,6 +28,17 @@ The package ids carry NO license suffix. That is a deliberate, user-chosen
 deviation from the CodeBrix family convention, shared with the other
 CodeBrix.Develop.* packages. Do not "fix" it.
 
+There is likewise NO root solution file, and that too is deliberate. Every
+other CodeBrix repository has a <Repo>.slnx carrying "Solution Items" and
+"Tests" folders; this one is a C++/cmake repository whose two packaging
+projects are built and packed individually, so a root solution would have
+nothing useful to hold. The only solution here is test-suite/test-suite.sln,
+which is upstream's. Do not add a root .slnx, and do not report its absence as
+repository drift.
+
+For the same reason there is no root global.json: the repo has no dotnet test
+run to point at a test runner.
+
 
 REPOSITORY LAYOUT
 =================
@@ -269,8 +280,14 @@ CODING CONVENTIONS
     bin/-folder warning comment.
   - Documentation edits go to the root .txt files (AGENT-README,
     MAINTAINER-README, EXTRAS-README, README-INDEX). docs/ belongs to upstream.
-  - No version numbers in AGENT-README.txt other than the one-line upstream
-    provenance statement.
+  - NO version numbers in AGENT-README.txt at all -- not even in the upstream
+    provenance statement. Write it version-free ("a fork of the Samsung
+    netcoredbg project"); the exact release lineage belongs here and in
+    THIRD-PARTY-NOTICES.txt.
+  - README.md is the CodeBrix package page: it follows the family README
+    template and carries no build instructions. Build, test and developer
+    material belongs in this file -- see the three "(moved here from
+    README.md)" sections at the end.
 
 
 NOTES
@@ -286,4 +303,270 @@ NOTES
     queued request. If a change makes an operation slower than that, consumers
     see "Command execution timed out." rather than a hang - check
     src/protocols/vscodeprotocol.cpp before blaming a client.
+
+
+BUILDING FROM SOURCE CODE (moved here from README.md)
+=====================================================
+The material below was the root README.md's own build documentation. It is
+reproduced here verbatim in substance -- README.md is now the CodeBrix package
+page and carries none of it. Where it overlaps the BUILDING section above,
+BUILDING above is the CodeBrix-maintained summary and this section is the
+fuller original.
+
+The sources can be built on Linux, MacOS, or Windows.
+
+Supported architectures (upstream; only linux-x64 and linux-arm64 are
+packaged):
+    ARM 32-bit, ARM 64-bit, x64, x86, RISC-V 64-bit, LoongArch 64-bit
+
+UNIX
+----
+The build requires Microsoft's .NET, and as such can only be built in Linux.
+Microsoft supports a few distributions, the details of which can be found here:
+https://learn.microsoft.com/en-us/dotnet/core/install/linux
+
+Prerequisites:
+
+  1. Install `cmake`, and either `make` or `ninja`.
+  2. Install the clang C++ compiler (the build does NOT work with gcc).
+  3. Microsoft's .NET RUNTIME should be installed:
+     https://dotnet.microsoft.com/download
+  4. You may also need common developer tools not mentioned here, such as Git
+     (https://www.git-scm.com/downloads).
+  5. It is expected that you place the sources within a directory.
+  6. Optional: the build requires the CoreCLR RUNTIME SOURCE CODE, which is
+     typically downloaded automatically, but can also be downloaded manually
+     from https://github.com/dotnet/runtime -- for example, you can check out
+     tag v8.x.
+  7. Optional: the build requires the .NET SDK, which is typically downloaded
+     automatically, but can also be downloaded manually from
+     https://dotnet.microsoft.com/download
+
+Compiling. Configure the build with:
+
+    $ mkdir build
+    $ cd build
+    build$ CC=clang CXX=clang++ cmake ..
+
+In order to run tests after a successful build, add the option
+`-DCMAKE_INSTALL_PREFIX=$PWD/../bin`.
+
+To enable the Source-Based Code Coverage feature
+(https://clang.llvm.org/docs/SourceBasedCodeCoverage.html), add the
+`-DCLR_CMAKE_ENABLE_CODE_COVERAGE` option.
+
+If you have previously downloaded the .NET SDK or CoreCLR sources, add:
+`-DDOTNET_DIR=/path/to/sdk/dir -DCORECLR_DIR=/path/to/coreclr/sources`.
+
+If cmake tries to download the .NET SDK or CoreCLR sources and fails, see
+bullet numbers 6 and 7 above -- any required files can be downloaded manually.
+
+After configuration has finished, build and install:
+
+    build$ make
+    ...
+    build$ make install
+
+To perform a build from scratch, including the configuration step, delete any
+artifacts first:
+
+    build$ cd ..
+    $ rm -rf build src/debug/netcoredbg/bin bin
+
+NOTE: the `bin` directory contains the "installed" binaries used for tests. If
+you have installed the debugger in other places, for example in
+/usr/local/bin, remove it manually -- the build system does not currently
+implement automatic uninstalling.
+
+Prerequisites and compiling with INTEROP MODE support (Linux and Tizen OSes
+only). The prerequisites and compiling process are the same as above with the
+following changes:
+
+  1. Depending on your distro, install either the `libunwind-dev` or the
+     `libunwind-devel` package.
+  2. Configure the build with:
+
+    build$ CC=clang CXX=clang++ cmake .. -DINTEROP_DEBUGGING=1
+
+For more detail on interop mode, see docs/interop.md.
+
+MACOS
+-----
+Install homebrew from https://brew.sh/ . After this, the build instructions
+are the same as for Unix, including the prerequisites.
+
+NOTE: the MacOS arm64 build (M1) is community supported and may not work as
+expected; some tests may fail.
+
+WINDOWS
+-------
+Prerequisites:
+
+  1. Download and install CMake from https://cmake.org/download
+  2. Download and install Microsoft's Visual Studio 2019 or newer from
+     https://visualstudio.microsoft.com/downloads . During installation you
+     should install all of the options required for C# and C++ development on
+     Windows.
+  3. Download and install Git; a few options:
+       - original Git:  https://git-scm.com/download/win
+       - TortoiseGit:   https://tortoisegit.org/download
+       - git in cygwin: https://cygwin.com/install.html
+  4. Use Git to place the sources in a directory.
+  5. May be omitted -- cmake will automatically download all necessary files.
+     If it fails, manually download the CoreCLR SOURCES into another directory
+     from https://github.com/dotnet/runtime -- for example, you can use the
+     latest tag v8.x.
+  6. May also be omitted -- cmake will automatically download all necessary
+     files. If it fails, manually download and install the .NET SDK from
+     https://dotnet.microsoft.com/download
+
+Compiling. Configure the build with the following commands, given in the
+source tree:
+
+    C:\...\netcoredbg> md build
+    C:\...\netcoredbg> cd build
+    C:\...\netcoredbg\build> cmake .. -G "Visual Studio 16 2019"
+
+NOTE: run this command from cmd.exe, NOT from cygwin's shell.
+
+The `-G` option specifies which instance of Visual Studio should build the
+project. The minimum requirement for the build is the Visual Studio 2019
+version.
+
+To run tests after a successful build, add the option
+`-DCMAKE_INSTALL_PREFIX="%cd%\..\bin"`.
+
+If you have downloaded either the .NET SDK or the .NET Core sources manually,
+add: `-DDOTNET_DIR="c:\Program Files\dotnet" -DCORECLR_DIR="path\to\coreclr"`
+
+To compile and install:
+
+    C:\...\netcoredbg\build> cmake --build . --target install
+
+To perform a build from scratch, including the configuration step, delete any
+artifacts first:
+
+    C:\...\netcoredbg\build> cd ..
+    C:\...\netcoredbg> rmdir /s /q build src\debug\netcoredbg\bin bin
+
+NOTE: the `bin` directory contains the "installed" binaries used for tests. If
+you have installed the debugger in other places, remove it manually -- the
+build system does not currently perform automatic uninstalling.
+
+
+RUNNING THE DEBUGGER FROM A BUILD (moved here from README.md)
+============================================================
+After the instructions above, the `netcoredbg` binary and its additional
+libraries are installed in some directory. For development purposes (running
+tests, debugging, etc.) the `bin` directory in the source tree is typically
+used.
+
+Running the debugger with the `--help` option should look like this:
+
+    $ ../bin/netcoredbg --help
+    .NET Core debugger
+
+    Options:
+    --buildinfo                           Print build info.
+    --attach <process-id>                 Attach the debugger to the specified process id.
+    --interpreter=cli                     Runs the debugger with Command Line Interface.
+    --interpreter=mi                      Puts the debugger into MI mode.
+    --interpreter=vscode                  Puts the debugger into VS Code Debugger mode.
+    --command=<file>                      Interpret commands file at the start.
+    -ex "<command>"                       Execute command at the start
+    --run                                 Run program without waiting commands
+    --engineLogging[=<path to log file>]  Enable logging to VsDbg-UI or file for the engine.
+                                          Only supported by the VsCode interpreter.
+    --server[=port_num]                   Start the debugger listening for requests on the
+                                          specified TCP/IP port instead of stdin/out. If port is not specified
+                                          TCP 4711 will be used.
+    --log[=<type>]                        Enable logging. Supported logging to file and to dlog (only for Tizen)
+                                          File log by default. File is created in 'current' folder.
+    --version                             Displays the current version.
+
+Basically, to debug .NET code, run the debugger with the following command
+line:
+
+    $ /path/to/netcoredbg --interpreter=TYPE -- /path/to/dotnet /path/to/program.dll
+
+
+NOTES FOR DEVELOPERS (moved here from README.md)
+================================================
+Running the tests
+-----------------
+Detailed instructions on how to run tests are in the `test-suite` directory:
+test-suite/README.md . You simply need to build and install into the `bin`
+directory (in the source tree), then change directory to `test-suite` and run
+the script `./run_tests.sh`.
+
+For a "Source-Based Code Coverage" report, add a `-c` or `--coverage` option to
+the command line, i.e. `./run_tests.sh -c [[testname1][testname2]..]`. For that
+case the build configuration must have been made with the
+`-DCLR_CMAKE_ENABLE_CODE_COVERAGE` option (see above). This feature is
+currently only supported on Unix-like platforms.
+
+Building and running unit tests
+-------------------------------
+To build the unit tests, add the CMake option `-DBUILD_TESTING=ON`. After a
+successful build, run them with `make test`. See src/unittests/README.md.
+
+Enabling logs
+-------------
+On the Tizen platform the debugger sends logs to the system logger. On other
+platforms, specify the file logs will be written to by setting an environment
+variable, for example:
+
+    export LOG_OUTPUT=/tmp/log.txt
+
+Each line of the log file uses the same format, explained below:
+
+    5280715.183 D/NETCOREDBG(P12036, T12036): cliprotocol.cpp: evalCommands(1309) > evaluating: 'source file.txt'
+          ^     ^  ^          ^       ^        ^               ^            ^       ^
+          |     |  |          |       |        |               |            |       `-- Message itself.
+          |     |  |          |       |        |               |            |
+          |     |  |          |       |        |               |            `-- Source line number.
+          |     |  |          |       |        |               |
+          |     |  |          |       |        |               `-- This is function name.
+          |     |  |          |       |        |
+          |     |  |          |       |        `-- This is file name in which logging is performed.
+          |     |  |          |       |
+          |     |  |          |       `-- This is thread ID.
+          |     |  |          |
+          |     |  |          `-- This is process PID
+          |     |  |
+          |     |  `-- This program name (always NETCOREDBG).
+          |     |
+          |     `-- This is log level: E is for error, W is for warnings, D is for debug...
+          |
+          `--- This is time in seconds from the boot time (might be wrapped around).
+
+Selecting between Debug and Release builds
+------------------------------------------
+Select the build type with one of the following CMake options:
+
+  * -DCMAKE_BUILD_TYPE=Debug     a debug build (zero optimizations, but
+                                 suitable for debugging)
+  * -DCMAKE_BUILD_TYPE=Release   a release build (optimized, but difficult to
+                                 debug)
+
+By default the build system creates release builds.
+
+Using the address sanitizer
+---------------------------
+Example:
+
+    CC=clang-10 CXX=clang++-10 cmake .. -DCMAKE_INSTALL_PREFIX=$PWD/../bin -DCMAKE_BUILD_TYPE=Debug -DCORECLR_DIR=/path/to/coreclr -DDOTNET_DIR=/usr/share/dotnet -DASAN=1
+
+Using clang-tidy
+----------------
+First, install clang-10. Next, to use clang-tidy, modify the commands used to
+configure the build as below:
+
+    CC=clang-10 CXX=clang++-10 cmake .. . -DCMAKE_CXX_CLANG_TIDY=clang-tidy-10 -DCMAKE_INSTALL_PREFIX=$PWD/../bin
+
+Then just run `make`. Any and all errors will be printed to stderr. See:
+https://blog.kitware.com/static-checks-with-cmake-cdash-iwyu-clang-tidy-lwyu-cpplint-and-cppcheck/
+
+NOTE: due to miscellaneous problems, the following tools currently will not
+work here: clang-analyzer (scan-build), cpplint, cppcheck, and iwyu.
 ================================================================================

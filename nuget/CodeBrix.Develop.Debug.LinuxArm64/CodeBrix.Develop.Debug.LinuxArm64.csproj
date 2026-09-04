@@ -71,7 +71,7 @@
     <Product>CodeBrix.Develop.Debug.LinuxArm64</Product>
     <Title>CodeBrix.Develop.Debug.LinuxArm64</Title>
     <Authors>Jeremy Ellis</Authors>
-    <Description>The NetCoreDbg debugger for the .NET runtime (GDB/MI and VSCode Debug Adapter Protocol), packaged as linux-arm64 native binaries. On build, the debugger is copied into the consuming application's output folder (netcoredbg/ subfolder), ready to be launched as a child process. Derived from the Samsung netcoredbg project.</Description>
+    <Description>A debugger for the .NET runtime (GDB/MI and VSCode Debug Adapter Protocol), packaged as linux-arm64 native binaries. On build, the debugger is copied into the consuming application's output folder (netcoredbg/ subfolder), ready to be launched as a child process. Contains no managed library and adds no NuGet dependencies.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ellisnet/CodeBrix.Develop.Debug</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ellisnet/CodeBrix.Develop.Debug</RepositoryUrl>
@@ -82,7 +82,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <IsPackable>true</IsPackable>
-    <PackageTags>netcoredbg;debugger;debugging;dap;debug-adapter-protocol;gdb-mi;dotnet;linux;arm64;CodeBrix</PackageTags>
+    <PackageTags>debugger;debugging;dap;debug-adapter-protocol;gdb-mi;dotnet;linux;arm64;CodeBrix</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

@@ -25,7 +25,7 @@ executable and does not care what your application targets; the .NET version
 that matters at run time is the one the DEBUGGED program uses.
 
 Provenance: this is an exact fork of the Samsung netcoredbg project
-(https://github.com/Samsung/netcoredbg), release lineage 3.2.0, with CodeBrix
+(https://github.com/Samsung/netcoredbg), with CodeBrix
 packaging added on top. Because nothing managed is shipped, there are no
 upstream namespaces to avoid and no type names to remap.
 
