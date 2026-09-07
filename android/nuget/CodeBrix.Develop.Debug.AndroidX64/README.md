@@ -4,9 +4,7 @@ A debugger for the .NET runtime, packaged as **android-x64 native binaries that 
 
 This package supports **android-x64 only** (64-bit x86 (x86_64) devices and emulators - the Android Studio emulator images). It is a carrier for native binaries, contains no managed library, and adds no NuGet dependencies.
 
-CodeBrix.Develop.Debug.AndroidX64 supports applications and assemblies that target Microsoft .NET version 10.0 and later.
-Microsoft .NET version 10.0 is a Long-Term Supported (LTS) version of .NET, and was released on Nov 11, 2025; and will be actively supported by Microsoft until Nov 14, 2028.
-Please update your C#/.NET code and projects to the latest LTS version of Microsoft .NET.
+CodeBrix.Develop.Debug.AndroidX64 supports applications and assemblies that target Microsoft .NET version 11.0 and later.
 
 ## Installation
 
