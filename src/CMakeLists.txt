@@ -239,7 +239,15 @@ add_executable(netcoredbg ${netcoredbg_SRC})
 if (WIN32)
     target_link_libraries(netcoredbg corguids wsock32 ws2_32 linenoise)
 else()
-    target_link_libraries(netcoredbg corguids dl pthread linenoise)
+    # Android (bionic) has NO separate libpthread — the pthread API lives in
+    # libc — so asking for it fails the link with "unable to find library
+    # -lpthread". libdl.so does exist on Android and is still linked in
+    # (transitively); only pthread has to go.
+    if(ANDROID)
+        target_link_libraries(netcoredbg corguids dl linenoise)
+    else()
+        target_link_libraries(netcoredbg corguids dl pthread linenoise)
+    endif()
     if (EXISTS "${CORECLR_MINIPAL_SRC_DIR}/guid.c")
         target_link_libraries(netcoredbg minipalguid)
     endif()
