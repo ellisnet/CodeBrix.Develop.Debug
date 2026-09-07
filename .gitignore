@@ -57,3 +57,13 @@ tags
 # netcoregdb's command history
 .netcoredbg_hist
 .claude/settings.local.json
+
+# Android debugging bundle (android/): its self-contained build inputs are
+# committed, and the prebuilt arm64 binaries must be re-included past the blanket
+# *.so rule above so a fresh clone can run Part 2 without rebuilding first.
+# Build outputs written INTO the vendored trees stay ignored (obj/, artifacts/).
+!/android/**/prebuilt/
+!/android/dbgshim/prebuilt/libdbgshim.so
+!/android/harness/prebuilt/libtrace.so
+/android/dbgshim/build-arm64/
+/android/dbgshim/diagnostics-src/artifacts/

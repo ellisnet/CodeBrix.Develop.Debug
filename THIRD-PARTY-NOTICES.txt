@@ -5,6 +5,10 @@ native binaries of the NetCoreDbg debugger. Everything in this package is a
 build of third-party open-source software, as detailed below. The package
 adds no original code beyond the packaging itself.
 
+The CodeBrix.Develop.Debug repository additionally carries, under the android/
+folder, a self-contained bundle for building the Android arm64 debugger pieces.
+That bundle VENDORS pinned source subsets of third-party projects; see item 4.
+
 If you have any questions about any third-party code referenced here, or if
 you believe that any third-party code has been included in
 CodeBrix.Develop.Debug.LinuxX64 in error, please open a new issue at:
@@ -71,13 +75,59 @@ https://github.com/ellisnet/CodeBrix.Develop.Debug/issues
    Microsoft.CodeAnalysis.Scripting.dll,
    Microsoft.CodeAnalysis.CSharp.Scripting.dll
 
-   Project:   Roslyn (the .NET Compiler Platform), 2.x-era scripting stack
-              used by NetCoreDbg's ManagedPart for expression evaluation
+   Project:   Roslyn (the .NET Compiler Platform) scripting stack, used by
+              NetCoreDbg's ManagedPart for expression evaluation
    Source:    https://github.com/dotnet/roslyn
-   Authors:   Microsoft Corporation / .NET Foundation and Contributors
-   License:   Apache-2.0 (the license of the Roslyn 2.x releases these
-              binaries come from; later Roslyn releases are MIT)
-              https://www.apache.org/licenses/LICENSE-2.0
+              (NuGet: Microsoft.CodeAnalysis.CSharp.Scripting and its
+              dependencies Microsoft.CodeAnalysis.Common / .CSharp /
+              .Scripting.Common)
+   Version:   2.3.0. ManagedPart.csproj pins "[2.3,)", which NuGet resolves to
+              the 2.3.0 packages; confirmed in ManagedPart.deps.json.
+   Authors:   Microsoft Corporation
+   License:   MICROSOFT .NET LIBRARY LICENSE — this is the license the 2.3.0
+              NuGet packages THEMSELVES declare, and it governs the binaries
+              redistributed here. Their nuspec carries
+                <licenseUrl>http://go.microsoft.com/fwlink/?LinkId=529443</licenseUrl>
+              (redirects to https://www.microsoft.com/net/dotnet_library_license.htm)
+              and <requireLicenseAcceptance>true</requireLicenseAcceptance>.
+
+              IMPORTANT distinction: the Roslyn SOURCE repository
+              (github.com/dotnet/roslyn) is licensed Apache-2.0, but the
+              redistributed 2.3.0 BINARY packages are under the Microsoft .NET
+              Library License above -- that license, not Apache-2.0, is what
+              applies to these DLLs. (An earlier revision of this file
+              incorrectly listed Apache-2.0.) Roslyn's NuGet packages
+              relicensed to MIT in the 3.x/4.x era: e.g. the 4.0.1 and 4.8.0
+              nuspecs declare <license type="expression">MIT</license>.
+
+================================================================================
+
+4. Vendored source under android/ (Android arm64 debugging bundle)
+
+   The android/ folder vendors small, pinned SOURCE subsets so the Android
+   debugger pieces build with no network and no moving dependency. Every
+   vendored file retains its original per-file header
+   ("Licensed to the .NET Foundation ... under the MIT license"). All of it is
+   MIT, (c) Microsoft Corporation / .NET Foundation and Contributors; the MIT
+   permission text is identical to the one reproduced under item 1 above.
+
+   a. dbgshim source  ->  android/dbgshim/diagnostics-src/
+      Project:  .NET diagnostics (dbgshim)
+      Source:   https://github.com/dotnet/diagnostics
+      Pinned:   commit 49690774d0221df76b01afafd6df730f406ae01b
+      License:  MIT (https://github.com/dotnet/diagnostics/blob/main/LICENSE.TXT)
+
+   b. CoreCLR headers / IDL  ->  android/netcoredbg/coreclr-deps/
+      Project:  .NET runtime (CoreCLR), header/IDL subset + src/native/minipal
+      Source:   https://github.com/dotnet/runtime
+      Pinned:   commit cc77fc9ccf5aef06473cdbde6a916dcd5e5faa7b
+      License:  MIT (https://github.com/dotnet/runtime/blob/main/LICENSE.TXT)
+
+   Note: LLVM/libunwind-derived files from these repositories (which carry
+   Apache-2.0-WITH-LLVM-exception, and University of Illinois / Hewlett-Packard
+   notices, not MIT) are NOT used by the Android build and have been deliberately
+   EXCLUDED from the vendored subsets, so the android/ folder is distributable in
+   full under the repository's MIT license. android/NOTICE.txt records the same.
 
 ================================================================================
 

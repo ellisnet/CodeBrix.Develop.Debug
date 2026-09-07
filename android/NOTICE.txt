@@ -1,0 +1,31 @@
+Android debugging bundle — third-party sources vendored here
+============================================================
+
+This folder vendors small, pinned subsets of two Microsoft repositories so the
+Android arm64 debugger pieces can be rebuilt with no network and no moving
+dependency. Both are MIT licensed; copyright remains with the .NET Foundation
+and contributors. Full license text: https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
+
+1. dbgshim source  ->  dbgshim/diagnostics-src/
+   From github.com/dotnet/diagnostics, pinned to commit
+   49690774d0221df76b01afafd6df730f406ae01b
+   Subset: eng/native, src/shared, src/dbgshim, src/inc
+   (LLVM/libunwind-derived headers under src/shared/inc/llvm were REMOVED --
+    unused by the build and not MIT.)
+   Built by dbgshim/CMakeLists.txt (a wrapper written for this project) into
+   libdbgshim.so for android-arm64.
+
+2. CoreCLR headers/IDL  ->  netcoredbg/coreclr-deps/
+   From github.com/dotnet/runtime, pinned to commit
+   cc77fc9ccf5aef06473cdbde6a916dcd5e5faa7b  (release/10.0 at capture time)
+   Subset: src/coreclr/{pal/prebuilt, pal/inc, inc, debug/inc, debug/shim,
+           dlls, hosts} + src/native/minipal  -- the only headers/IDL the
+           netcoredbg build includes/compiles. Non-MIT LLVM/libunwind-derived
+           files (pal/src, inc/llvm, debug/daccess|di|ee, ...) were EXCLUDED.
+   NOTE: the repo's own fetchdeps.cmake would instead clone the full 1.2 GB
+   dotnet/runtime from the MOVING branch release/10.0; the netcoredbg build
+   script here passes -DCORECLR_DIR at this vendored subset to stay small and
+   reproducible.
+
+netcoredbg itself is the parent repository (CodeBrix.Develop.Debug, a fork of
+Samsung's netcoredbg, MIT). It is NOT vendored here — it is the repo you cloned.

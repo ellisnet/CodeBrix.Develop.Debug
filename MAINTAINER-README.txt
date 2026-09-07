@@ -583,3 +583,72 @@ https://blog.kitware.com/static-checks-with-cmake-cdash-iwyu-clang-tidy-lwyu-cpp
 NOTE: due to miscellaneous problems, the following tools currently will not
 work here: clang-analyzer (scan-build), cpplint, cppcheck, and iwyu.
 ================================================================================
+
+
+================================================================================
+ROSLYN (Microsoft.CodeAnalysis) — PROVENANCE, VERSION, AND LICENSING FINDINGS
+2026-09-07. Recorded here so the licensing story is not re-derived every time.
+================================================================================
+
+WHERE IT COMES FROM
+  Roslyn is inherited from upstream Samsung netcoredbg, NOT added by CodeBrix.
+  ManagedPart (netcoredbg's managed expression evaluator) uses the Roslyn
+  scripting APIs to compile watch/evaluate expressions at debug time.
+    - Reference:  src/managed/ManagedPart.csproj
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting"
+                          Version="[2.3,)" />
+    - Consumers:  src/managed/StackMachine.cs
+        using Microsoft.CodeAnalysis; using Microsoft.CodeAnalysis.CSharp;
+    - The csproj + evaluator predate the CodeBrix fork (git history on that file:
+      "Add first stage of new evaluation implementation", "Refactor managed
+      part", "Add .NET 7 build support" — all netcoredbg-lineage commits).
+
+WHICH VERSION ACTUALLY SHIPS
+  The version constraint "[2.3,)" has NO upper bound, so NuGet resolves it to the
+  LOWEST satisfying version, which is 2.3.0. Confirmed in the build output:
+      build/src/ManagedPart.deps.json  ->
+        Microsoft.CodeAnalysis.Common/2.3.0
+        Microsoft.CodeAnalysis.CSharp/2.3.0
+        Microsoft.CodeAnalysis.CSharp.Scripting/2.3.0
+        Microsoft.CodeAnalysis.Scripting.Common/2.3.0
+  So the four Microsoft.CodeAnalysis*.dll files packaged with the debugger are
+  the 2.3.0 (2.x-era) release. (Raw `strings` on the DLLs can show "4.0.0.0",
+  which is a frozen assembly-version / unrelated embedded string — do not trust
+  it; the deps.json is authoritative.)
+
+THE LICENSE — SUBTLE, AND PREVIOUSLY MIS-STATED
+  These 2.3.0 BINARY packages are under the MICROSOFT .NET LIBRARY LICENSE, not
+  Apache-2.0. Evidence, from the packages' own nuspec (in the NuGet cache,
+  e.g. ~/.nuget/packages/microsoft.codeanalysis.common/2.3.0/*.nuspec):
+      <licenseUrl>http://go.microsoft.com/fwlink/?LinkId=529443</licenseUrl>
+      <requireLicenseAcceptance>true</requireLicenseAcceptance>
+      (no <license type="expression"> element)
+  fwlink LinkId=529443 redirects (HTTP 302) to
+      https://www.microsoft.com/net/dotnet_library_license.htm
+  i.e. the "Microsoft .NET Library License". requireLicenseAcceptance=true is a
+  hallmark of that EULA; open-source (MIT/Apache) packages set it false and carry
+  a <license> expression instead.
+
+  THE DISTINCTION THAT CAUSED THE ERROR: the Roslyn SOURCE repo
+  (github.com/dotnet/roslyn) is Apache-2.0, but the redistributed 2.3.0 NuGet
+  BINARIES are under the Microsoft .NET Library License. It is the package
+  license that governs the DLLs we ship. THIRD-PARTY-NOTICES.txt item 3 (and
+  AGENT-README.txt) originally listed "Apache-2.0"; THIRD-PARTY-NOTICES.txt has
+  been corrected (2026-09-07). AGENT-README.txt still carries the old
+  "Apache-2.0 / Roslyn 2.x era" wording (around its "packaged third-party
+  binaries" note) and should be corrected to match if/when that file is next
+  revised.
+
+  For contrast, MODERN Roslyn is MIT: the 4.0.1 and 4.8.0
+  Microsoft.CodeAnalysis.Common nuspecs declare
+      <license type="expression">MIT</license>.
+
+OPTIONS IF CLEAN MIT LICENSING IS WANTED
+  1. Keep 2.3.0 and attribute it correctly as the Microsoft .NET Library License
+     (done in THIRD-PARTY-NOTICES.txt). No code change.
+  2. Bump the ManagedPart dependency to a modern Roslyn (>= 4.x), which is MIT.
+     This is a FUNCTIONAL change to the evaluator and must be built and tested
+     (API differences between Roslyn 2.3 and 4.x scripting); not a doc-only edit.
+
+NOTE: none of this concerns the android/ folder — that bundle contains no Roslyn.
+================================================================================
