@@ -9,6 +9,7 @@
 #include <coreclrhost.h>
 #include <thread>
 #include <string>
+#include <cstdlib>
 
 #include "palclr.h"
 #include "utils/platform.h"
@@ -186,6 +187,21 @@ void Init(const std::string &coreClrPath)
         throw std::invalid_argument("coreclr_initialize not found in lib, CoreCLR path=" + coreClrPath);
 
     std::string tpaList;
+
+    // Android: the debuggee's managed assemblies are NOT next to libcoreclr.so.
+    // The APK's native library directory is read-only and holds only .so files,
+    // while the assemblies live in /data/data/<pkg>/files/.__override__/<abi>/.
+    // The launcher passes that directory in NETCOREDBG_ANDROID_ASSEMBLY_DIR, so
+    // scan it first and let the hosted runtime (the second CoreCLR that runs
+    // ManagedPart.dll) find its framework there. clrDir is still scanned after
+    // it -- on Android that directory contributes nothing, and when the variable
+    // is unset (every desktop build) the behaviour is exactly as before.
+    // Note: NATIVE_DLL_SEARCH_DIRECTORIES stays clrDir and APP_PATHS stays the
+    // netcoredbg executable directory (where ManagedPart.dll and Roslyn sit).
+    const char *androidAssemblyDir = std::getenv("NETCOREDBG_ANDROID_ASSEMBLY_DIR");
+    if (androidAssemblyDir != nullptr && androidAssemblyDir[0] != '\0')
+        InteropPlatform::AddFilesFromDirectoryToTpaList(androidAssemblyDir, tpaList);
+
     InteropPlatform::AddFilesFromDirectoryToTpaList(clrDir, tpaList);
 
     const char *propertyKeys[] = {

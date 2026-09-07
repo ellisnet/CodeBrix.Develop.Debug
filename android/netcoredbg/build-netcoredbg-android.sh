@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Build the netcoredbg debugger binary for an Android ABI from THIS repo
-# (CodeBrix.Develop.Debug -- the parent of the android/ folder). The only
-# Android-specific source change (bionic has no libpthread) is already committed
-# in ../../src/CMakeLists.txt.
+# (CodeBrix.Develop.Debug -- the parent of the android/ folder). The Android-
+# specific source is committed in the repo's src/ tree: the bionic link fix in
+# src/CMakeLists.txt, and the built-in Android compatibility layer
+# src/utils/android_compat.cpp (compiled only for Android builds; it replaces
+# the LD_PRELOAD harness -- see ../README.md).
 #
 # Usage: build-netcoredbg-android.sh [<abi>]   abi = arm64-v8a (default) | x86_64
 # Output: build/android-<arch>/src/netcoredbg AND refreshed prebuilt/<abi>/netcoredbg
@@ -45,7 +47,14 @@ echo "=== built: $BUILD/src/netcoredbg"; ls -la "$BUILD/src/netcoredbg"
 OUT="$HERE/prebuilt/$ABI"
 mkdir -p "$OUT"
 cp "$BUILD/src/netcoredbg" "$OUT/netcoredbg"
-echo "=== refreshed $OUT/netcoredbg ($ABI)"
+# The NDK's Release build keeps the full symbol table (~33 MB). Strip it for the
+# committed/packaged copy: --strip-unneeded drops .symtab and debug sections but
+# keeps .dynsym, so the exported Android compat symbols (kill/open/openat/...)
+# that dlopen'ed libmscordbi.so resolves against the executable are untouched.
+"$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-unneeded "$OUT/netcoredbg"
+echo "=== refreshed $OUT/netcoredbg ($ABI, stripped)"; ls -la "$OUT/netcoredbg"
+echo "=== exported Android compat symbols (expect 6: kill open open64 openat __open_2 __openat_2):"
+"$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D --defined-only "$OUT/netcoredbg" | awk '{print $3}' | grep -E '^(kill|open|open64|openat|__open_2|__openat_2)$' | sort | tr '\n' ' '; echo
 
 # This build is the NATIVE debugger only (-DBUILD_MANAGED=OFF). The managed helper
 # (ManagedPart.dll + Roslyn) is architecture-independent, built separately by

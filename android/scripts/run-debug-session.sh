@@ -9,8 +9,10 @@
 # pieces exist under ../*/prebuilt/<abi>/ + ../netcoredbg/prebuilt/managed/ (or run the
 # build-*.sh scripts first). Nothing here needs the .NET 11 SDK.
 #
-# Usage: run-debug-session.sh [-s <serial>] [-p <package>] [-P <plan-file>]
+# Usage: run-debug-session.sh [-s <serial>] [-p <package>] [-P <plan-file>] [-t]
 #   -P  a plan file to run instead of the built-in one (see PLAN FORMAT below).
+#   -t  LD_PRELOAD the tracing harness (libtrace.so) instead of relying on the Android
+#       compatibility layer built into netcoredbg. Default: the built-in layer.
 #
 # PLAN FORMAT (one action per line; '#' comments):
 #   send <wait-seconds> <cli command...>   write one netcoredbg CLI command, wait, show replies
@@ -26,8 +28,8 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
-SERIAL=""; PKG="com.codebrix.simpledebugapp"; ACT_SUFFIX=".MainActivity"; PLAN=""
-while getopts "s:p:P:" o; do case $o in s) SERIAL="-s $OPTARG";; p) PKG="$OPTARG";; P) PLAN="$OPTARG";; esac; done
+SERIAL=""; PKG="com.codebrix.simpledebugapp"; ACT_SUFFIX=".MainActivity"; PLAN=""; HARNESS=0
+while getopts "s:p:P:t" o; do case $o in s) SERIAL="-s $OPTARG";; p) PKG="$OPTARG";; P) PLAN="$OPTARG";; t) HARNESS=1;; esac; done
 
 A(){ adb $SERIAL "$@" </dev/null; }
 RA(){ A shell "run-as $PKG sh -c '$*'"; }
@@ -46,9 +48,10 @@ NCDBG="$ROOT/netcoredbg/prebuilt/$ABI/netcoredbg"
 MANAGED="$ROOT/netcoredbg/prebuilt/managed"
 SHIM="$ROOT/dbgshim/prebuilt/$ABI/libdbgshim.so"
 TRACE="$ROOT/harness/prebuilt/$ABI/libtrace.so"
-for f in "$NCDBG" "$SHIM" "$TRACE" "$MANAGED/ManagedPart.dll"; do [ -f "$f" ] || { echo "MISSING: $f (run build-*.sh $ABI first)"; exit 1; }; done
+for f in "$NCDBG" "$SHIM" "$MANAGED/ManagedPart.dll"; do [ -f "$f" ] || { echo "MISSING: $f (run build-*.sh $ABI first)"; exit 1; }; done
+[ "$HARNESS" = 0 ] || [ -f "$TRACE" ] || { echo "MISSING: $TRACE (run harness/build-harness.sh $ABI, or drop -t)"; exit 1; }
 OVR="/data/data/$PKG/files/.__override__/$ABI"
-echo "== device ABI: $ABI"
+echo "== device ABI: $ABI   mode: $([ "$HARNESS" = 1 ] && echo 'LD_PRELOAD tracing harness' || echo 'built-in compat layer (no LD_PRELOAD)')"
 
 LASTLINES=0
 show(){ RA "cat $D/ncdbg.out" | tr -d '\r' > "$OUT/ncdbg.out"; local n; n=$(wc -l < "$OUT/ncdbg.out"); if [ "$n" -gt "$LASTLINES" ]; then sed -n "$((LASTLINES+1)),${n}p" "$OUT/ncdbg.out" | grep -v '^$' | cut -c1-400 | sed 's/^/    | /'; fi; LASTLINES=$n; }
@@ -104,7 +107,7 @@ echo "== place debugger + managed helper in the app sandbox (via run-as, as the 
 A shell mkdir -p /data/local/tmp/ncdbg
 A push "$NCDBG"  /data/local/tmp/ncdbg/netcoredbg   >/dev/null
 A push "$SHIM"   /data/local/tmp/ncdbg/libdbgshim.so >/dev/null
-A push "$TRACE"  /data/local/tmp/ncdbg/libtrace.so   >/dev/null
+[ "$HARNESS" = 0 ] || A push "$TRACE"  /data/local/tmp/ncdbg/libtrace.so   >/dev/null
 for f in "$MANAGED"/*.dll; do A push "$f" /data/local/tmp/ncdbg/ >/dev/null; done
 A shell chmod 644 /data/local/tmp/ncdbg/*
 A shell "run-as $PKG sh -c 'mkdir -p $D && cp /data/local/tmp/ncdbg/* $D/ && chmod 755 $D/netcoredbg'"
@@ -122,8 +125,13 @@ LIBDIR="$(RA cat /proc/$PID/maps | grep -oE '/data/app/[^ ]*/lib/[a-z0-9_]+' | s
 echo "   fresh pid=$PID  apk-lib=$LIBDIR"
 RA "pkill -9 netcoredbg; rm -f $D/trace.txt $D/file $D/ncdbg.out $D/cmd.fifo; mkfifo $D/cmd.fifo" >/dev/null 2>&1
 
-echo "== attach (CLI reads commands from a FIFO; the harness masks the SELinux-blocked liveness check and redirects the hosted runtime's framework lookups)"
-A shell "run-as $PKG sh -c 'cd $D && (sleep 1200 > $D/cmd.fifo 2>/dev/null </dev/null &) && (LD_PRELOAD=$D/libtrace.so TRACE_OUT=$D/trace.txt TRACE_MASK_KILL0=1 TRACE_REDIR_DIR=$OVR TRACE_TPA_DIR=$OVR TRACE_CLR_DIR=$LIBDIR LD_LIBRARY_PATH=$LIBDIR TMPDIR=/data/data/$PKG/cache $D/netcoredbg --interpreter=cli --attach $PID --log=file < $D/cmd.fifo > $D/ncdbg.out 2>&1 &) ; sleep 2; pidof netcoredbg'" | tr -d '\r' | tail -1 > "$OUT/ncdbg.pid"
+if [ "$HARNESS" = 1 ]; then
+  ENV="LD_PRELOAD=$D/libtrace.so TRACE_OUT=$D/trace.txt TRACE_MASK_KILL0=1 TRACE_REDIR_DIR=$OVR TRACE_TPA_DIR=$OVR TRACE_CLR_DIR=$LIBDIR"
+else
+  ENV="NETCOREDBG_ANDROID_ASSEMBLY_DIR=$OVR NETCOREDBG_ANDROID_CLR_DIR=$LIBDIR NETCOREDBG_ANDROID_TRACE=$D/trace.txt"
+fi
+echo "== attach (CLI reads commands from a FIFO; the compat layer masks the SELinux-blocked liveness check and redirects the assembly/framework lookups)"
+A shell "run-as $PKG sh -c 'cd $D && (sleep 1200 > $D/cmd.fifo 2>/dev/null </dev/null &) && ($ENV LD_LIBRARY_PATH=$LIBDIR TMPDIR=/data/data/$PKG/cache $D/netcoredbg --interpreter=cli --attach $PID --log=file < $D/cmd.fifo > $D/ncdbg.out 2>&1 &) ; sleep 2; pidof netcoredbg'" | tr -d '\r' | tail -1 > "$OUT/ncdbg.pid"
 echo "   debugger pid=$(cat "$OUT/ncdbg.pid"); waiting 10 s for the attach"
 sleep 10; show
 

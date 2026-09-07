@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <thread>
 #include <future>
+#include <cstdlib>
+#include <cerrno>
 
 // note: order matters, vscodeprotocol.h should be included before winerror.h
 #include "protocols/vscodeprotocol.h"
@@ -996,7 +998,25 @@ void VSCodeProtocol::CommandsWorker()
         // we use max default timeout (15000), one timeout for all requests.
 
         // TODO add timeout configuration feature
-        std::future_status timeoutStatus = future.wait_for(std::chrono::milliseconds(15000));
+        // The 15000 ms default can be raised with NETCOREDBG_COMMAND_TIMEOUT_MS: on Android
+        // the attach that runs inside "configurationDone" regularly needs more than 15 s.
+        // Read once; an unset, malformed or zero value keeps the default.
+        static const long commandTimeoutMs = []() -> long
+        {
+            const char *env = std::getenv("NETCOREDBG_COMMAND_TIMEOUT_MS");
+            if (env == nullptr || env[0] == '\0')
+                return 15000;
+
+            char *end = nullptr;
+            errno = 0;
+            unsigned long value = std::strtoul(env, &end, 10);
+            if (errno != 0 || end == env || *end != '\0' || value == 0 || value > 0x7fffffffUL)
+                return 15000;
+
+            return static_cast<long>(value);
+        }();
+
+        std::future_status timeoutStatus = future.wait_for(std::chrono::milliseconds(commandTimeoutMs));
         if (timeoutStatus == std::future_status::timeout)
         {
             body["message"] = "Command execution timed out.";

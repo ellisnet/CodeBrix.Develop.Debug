@@ -1,0 +1,111 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Packaging-only project: produces the CodeBrix.Develop.Debug.AndroidArm64
+    NuGet package, which carries the android-arm64 build of the NetCoreDbg debugger
+    for Android devices whose primary ABI is arm64-v8a. The debugger runs ON the
+    device (inside the debugged app's sandbox, via run-as) and is driven from
+    the development machine over an adb-forwarded TCP port with the VSCode
+    Debug Adapter Protocol - see android/README.md in the repository. The
+    package contains no managed library - just the on-device payload under
+    tools/android-arm64/ and a build/*.targets file that copies it into the consuming
+    app's output folder (netcoredbg-android-arm64/ subfolder), from where the app pushes
+    it to a device.
+
+    The packed files are the committed prebuilt outputs of the android/ build
+    scripts (../../netcoredbg/prebuilt/arm64-v8a/, ../../dbgshim/prebuilt/arm64-v8a/ and
+    ../../netcoredbg/prebuilt/managed/). Rebuild them with the build-*.sh
+    scripts first if the source changed, then pack this project (or run
+    ../../scripts/pack-android-packages.sh, which does both checks and packs).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!--
+    Package / assembly version: date-stamped and auto-incrementing.
+
+    Format:  3.<x>.<y>.<z>   (every field is derived from UTC "now")
+
+      3  (major)     Always 3 for this library.
+      x  (minor)     Whole years since $(_VersionBaseYear).
+                     With base 2026: 2026=0, 2027=1, 2028=2, ...
+      y  (build)     Day of year, 1-based inclusive, UTC.
+                     Jan 1 = 1, Feb 1 = 32, Dec 31 = 365 (366 in a leap year).
+      z  (revision)  Minute of day, UTC, range 0 to 1439.
+                     00:00 = 0, 23:59 = 1439.
+
+    The version is always strictly increasing over time:
+      * within a day, z grows;
+      * at a day boundary, y increments and outranks z resetting to 0;
+      * at a (UTC) year boundary, x increments and outranks y and z resetting.
+
+    Notes / caveats:
+      * All fields read from System.DateTime.UtcNow, so a local dev build and a
+        UTC CI build agree on the value. Math.Floor on the minutes keeps z in
+        0..1439 (plain rounding could land on 1440 late in the day).
+      * Because the value depends on the clock, every build produces a NEW
+        version. With GeneratePackageOnBuild=true that means a fresh .nupkg on
+        each build, and two builds in the SAME UTC minute produce the SAME
+        version (so do not publish two packages from within one minute).
+      * This is date-stamp versioning, not SemVer: minor encodes the year and
+        major is pinned to 3 (matching the major version of the NetCoreDbg
+        debugger the package carries), so major/minor do not signal API
+        compatibility.
+      * To re-baseline the minor number, change _VersionBaseYear below.
+  -->
+  <PropertyGroup>
+    <_VersionBaseYear>2026</_VersionBaseYear>
+    <_VersionYears>$([MSBuild]::Subtract($([System.DateTime]::UtcNow.Year), $(_VersionBaseYear)))</_VersionYears>
+    <_VersionDayOfYear>$([System.DateTime]::UtcNow.DayOfYear)</_VersionDayOfYear>
+    <_VersionMinuteOfDay>$([System.Convert]::ToInt32($([System.Math]::Floor($([System.DateTime]::UtcNow.TimeOfDay.TotalMinutes)))))</_VersionMinuteOfDay>
+    <BuildVersion>3.$(_VersionYears).$(_VersionDayOfYear).$(_VersionMinuteOfDay)</BuildVersion>
+    <Version>$(BuildVersion)</Version>
+    <AssemblyVersion>$(BuildVersion)</AssemblyVersion>
+    <FileVersion>$(BuildVersion)</FileVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>CodeBrix.Develop.Debug.AndroidArm64</PackageId>
+    <Product>CodeBrix.Develop.Debug.AndroidArm64</Product>
+    <Title>CodeBrix.Develop.Debug.AndroidArm64</Title>
+    <Authors>Jeremy Ellis</Authors>
+    <Description>A debugger for the .NET runtime (VSCode Debug Adapter Protocol, GDB/MI and CLI), packaged as android-arm64 native binaries that run ON an Android device (ABI arm64-v8a) to debug .NET 11 CoreCLR Android apps. On build, the on-device payload is copied into the consuming application's output folder (netcoredbg-android-arm64/ subfolder), ready to be pushed to a device with adb and driven over an adb-forwarded port. Contains no managed library and adds no NuGet dependencies.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ellisnet/CodeBrix.Develop.Debug</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ellisnet/CodeBrix.Develop.Debug</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageIcon>icon-codebrix-128.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Copyright>Copyright (c) 2026 Jeremy Ellis and contributors</Copyright>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <IsPackable>true</IsPackable>
+    <PackageTags>debugger;debugging;dap;debug-adapter-protocol;dotnet;android;coreclr;adb;CodeBrix</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The on-device payload for arm64-v8a: the committed prebuilt outputs of the android/ build scripts. -->
+    <None Include="..\..\netcoredbg\prebuilt\arm64-v8a\netcoredbg" Pack="true" PackagePath="tools/android-arm64" />
+    <None Include="..\..\dbgshim\prebuilt\arm64-v8a\libdbgshim.so" Pack="true" PackagePath="tools/android-arm64" />
+    <!-- The managed helper (symbol reader + expression evaluator) is architecture-independent; each package carries its own copy so it is self-contained. -->
+    <None Include="..\..\netcoredbg\prebuilt\managed\ManagedPart.dll" Pack="true" PackagePath="tools/android-arm64" />
+    <None Include="..\..\netcoredbg\prebuilt\managed\Microsoft.CodeAnalysis.dll" Pack="true" PackagePath="tools/android-arm64" />
+    <None Include="..\..\netcoredbg\prebuilt\managed\Microsoft.CodeAnalysis.CSharp.dll" Pack="true" PackagePath="tools/android-arm64" />
+    <None Include="..\..\netcoredbg\prebuilt\managed\Microsoft.CodeAnalysis.Scripting.dll" Pack="true" PackagePath="tools/android-arm64" />
+    <None Include="..\..\netcoredbg\prebuilt\managed\Microsoft.CodeAnalysis.CSharp.Scripting.dll" Pack="true" PackagePath="tools/android-arm64" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="build\CodeBrix.Develop.Debug.AndroidArm64.targets" Pack="true" PackagePath="build" />
+    <None Include="..\..\..\icon-codebrix-128.png" Pack="true" PackagePath="" />
+    <None Include="README.md" Pack="true" PackagePath="" />
+    <None Include="..\..\..\AGENT-README.txt" Pack="true" PackagePath="" />
+    <None Include="..\..\..\THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

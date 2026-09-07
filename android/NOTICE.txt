@@ -2,8 +2,8 @@ Android debugging bundle — third-party sources vendored here
 ============================================================
 
 This folder vendors small, pinned subsets of two Microsoft repositories so the
-Android arm64 debugger pieces can be rebuilt with no network and no moving
-dependency. Both are MIT licensed; copyright remains with the .NET Foundation
+Android (arm64-v8a and x86_64) debugger pieces can be rebuilt with no network
+and no moving dependency. Both are MIT licensed; copyright remains with the .NET Foundation
 and contributors. Full license text: https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
 
 1. dbgshim source  ->  dbgshim/diagnostics-src/
@@ -33,15 +33,25 @@ and contributors. Full license text: https://github.com/dotnet/runtime/blob/main
    2.3.0 scripting binaries ManagedPart depends on; they are NOT MIT -- they
    are under the Microsoft .NET Library License, exactly as recorded for the
    NuGet-package copies in the repository root THIRD-PARTY-NOTICES.txt, item 3.
-   The bundle pushes all five files onto the phone next to netcoredbg so its
-   symbol reader and expression evaluator can run there (Part 3).
+   The bundle pushes all five files onto the device next to netcoredbg so its
+   symbol reader and expression evaluator can run there (Part 3), and both
+   Android NuGet packages carry a copy of them for the same reason.
 
 FIRST-PARTY files in this folder (this repository, MIT — not third-party):
    - dbgshim/CMakeLists.txt          the wrapper that builds libdbgshim.so
    - dbgshim/build-dbgshim-android.sh, netcoredbg/build-netcoredbg-android.sh,
      netcoredbg/build-managed-helper.sh, harness/build-harness.sh   build scripts
-   - harness/trace.c                 the LD_PRELOAD proof harness (-> libtrace.so)
-   - scripts/run-attach.sh, scripts/run-debug-session.sh            run drivers
+   - harness/trace.c                 the LD_PRELOAD tracing harness (-> libtrace.so);
+                                     its workarounds now live in the debugger itself
+                                     (../src/utils/android_compat.cpp, MIT)
+   - dap-probe/                      a plain C# Debug Adapter Protocol client used to
+                                     prove the on-device debugger over adb (Part 4)
+   - scripts/run-attach.sh, scripts/run-debug-session.sh,
+     scripts/run-dap-session.sh      run drivers (Parts 2, 3, 4)
+   - scripts/pack-android-packages.sh  verifies the prebuilt payload and packs the
+                                     two Android NuGet packages
+   - nuget/CodeBrix.Develop.Debug.AndroidArm64/, nuget/CodeBrix.Develop.Debug.AndroidX64/
+                                     the packaging projects (csproj, targets, README)
    - netcoredbg/prebuilt/<abi>/netcoredbg    our build of the netcoredbg in this
                                              repo's src/ (MIT)
    - dbgshim/prebuilt/<abi>/libdbgshim.so    our build of item 1 (MIT)

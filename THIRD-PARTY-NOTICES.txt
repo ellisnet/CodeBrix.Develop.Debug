@@ -1,17 +1,22 @@
 THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
 
-CodeBrix.Develop.Debug.LinuxX64 is a NuGet package that carries linux-x64
-native binaries of the NetCoreDbg debugger. Everything in this package is a
-build of third-party open-source software, as detailed below. The package
-adds no original code beyond the packaging itself.
+The CodeBrix.Develop.Debug packages (CodeBrix.Develop.Debug.LinuxX64,
+.LinuxArm64, .AndroidArm64 and .AndroidX64) are NuGet packages that carry native
+binaries of the NetCoreDbg debugger: linux-x64 / linux-arm64 builds that run on
+the development machine, and android-arm64 / android-x64 builds that run on an
+Android device. Everything in these packages is a build of third-party
+open-source software, as detailed below, plus a small amount of CodeBrix-authored
+code inside the netcoredbg executable (the Android compatibility layer,
+src/utils/android_compat.cpp, MIT like the rest of this repository).
 
 The CodeBrix.Develop.Debug repository additionally carries, under the android/
-folder, a self-contained bundle for building the Android arm64 debugger pieces.
-That bundle VENDORS pinned source subsets of third-party projects; see item 4.
+folder, a self-contained bundle for building the Android (arm64-v8a and x86_64)
+debugger pieces. That bundle VENDORS pinned source subsets of third-party
+projects; see item 4.
 
 If you have any questions about any third-party code referenced here, or if
-you believe that any third-party code has been included in
-CodeBrix.Develop.Debug.LinuxX64 in error, please open a new issue at:
+you believe that any third-party code has been included in one of the
+CodeBrix.Develop.Debug packages in error, please open a new issue at:
 https://github.com/ellisnet/CodeBrix.Develop.Debug/issues
 
 ================================================================================
@@ -106,13 +111,16 @@ https://github.com/ellisnet/CodeBrix.Develop.Debug/issues
 
 ================================================================================
 
-4. Vendored source under android/ (Android arm64 debugging bundle)
+4. Vendored source under android/ (Android debugging bundle, arm64-v8a + x86_64)
 
    The android/ folder vendors small, pinned SOURCE subsets so the Android
    debugger pieces build with no network and no moving dependency. (It also
-   carries prebuilt BINARIES: netcoredbg, libdbgshim.so and libtrace.so built
-   from this repository, ManagedPart.dll built from src/managed/ -- all MIT,
-   item 1 -- and the four Roslyn 2.3.0 assemblies covered by item 3 above.)
+   carries prebuilt BINARIES per ABI: netcoredbg and libtrace.so built from
+   this repository, libdbgshim.so built from item 4a, ManagedPart.dll built
+   from src/managed/ -- all MIT, item 1 -- and the four Roslyn 2.3.0
+   assemblies covered by item 3 above. The Android NuGet packages pack the
+   netcoredbg, libdbgshim.so and managed-helper files; libtrace.so and the
+   android/dap-probe C# tool are repository-only, MIT.)
    Every
    vendored file retains its original per-file header
    ("Licensed to the .NET Foundation ... under the MIT license"). All of it is

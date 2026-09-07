@@ -5,9 +5,10 @@ package
 ================================================================================
 
 This repository is a fork of a native C++ debugger, so most of what is here is
-upstream engineering content rather than CodeBrix samples. Only the two
-nuget/ packaging projects and the files they pack ship to consumers; everything
-described below stays in the repository.
+upstream engineering content rather than CodeBrix samples. Only the four
+packaging projects (nuget/ for Linux, android/nuget/ for Android) and the files
+they pack ship to consumers; everything described below stays in the
+repository.
 
 There are no CodeBrix sample applications and no CodeBrix test project in this
 repository - the packages carry no managed code.
@@ -130,6 +131,45 @@ upstream.
     container-build/output/linux-x64/, output/linux-arm64/
         The built binaries, COMMITTED (the root .gitignore re-includes them),
         so a checkout can reproduce the published packages.
+
+
+android/ - THE ANDROID DEBUGGING BUNDLE (CodeBrix content)
+=========================================================
+Everything needed to build, prove and package the on-device debugger for
+Android, self-contained and committed (vendored pinned sources + prebuilt
+binaries) so the two Android packages can be reproduced from a checkout. The
+full runbook and reference is android/README.md; the provenance is
+android/NOTICE.txt. Not packed as a whole - only the prebuilt payload files
+listed in the packaging projects ship.
+
+    android/dbgshim/            pinned dotnet/diagnostics subset + a wrapper
+                                CMakeLists that builds libdbgshim.so per ABI
+                                (build-dbgshim-android.sh; prebuilt/<abi>/)
+    android/netcoredbg/         pinned CoreCLR header/IDL subset the Android
+                                netcoredbg build compiles against; the per-ABI
+                                netcoredbg build script (build-netcoredbg-
+                                android.sh -> prebuilt/<abi>/, stripped); the
+                                managed helper build (build-managed-helper.sh
+                                -> prebuilt/managed/)
+    android/harness/            trace.c -> libtrace.so, the LD_PRELOAD tracing
+                                harness used during the investigation (syscall
+                                trace + clr-debug-pipe dump). The workarounds it
+                                pioneered are now compiled INTO netcoredbg
+                                (src/utils/android_compat.cpp); the harness is
+                                kept as a diagnostic tool and is NOT packed.
+    android/dap-probe/          a plain C# Debug Adapter Protocol client (no IDE
+                                code) that attaches to the app over an adb-
+                                forwarded port and drives a scripted session
+                                with a VERDICT - the Part 4 proof and a handy
+                                smoke test for a rebuilt payload.
+    android/scripts/            run-attach.sh (Part 2), run-debug-session.sh
+                                (Part 3, CLI over a FIFO), run-dap-session.sh
+                                (Part 4, DAP server + the probe; -n = the
+                                built-in compat layer, no LD_PRELOAD), and
+                                pack-android-packages.sh (verify + pack both
+                                Android packages).
+    android/nuget/              the two Android packaging projects (see
+                                MAINTAINER-README.txt, ANDROID PACKAGES).
 
 
 packaging/ - UPSTREAM DISTRO PACKAGING AND BUILD INPUTS

@@ -11,17 +11,28 @@ debugger for the .NET runtime implementing GDB/MI, the VSCode Debug Adapter
 Protocol and an interactive CLI - plus the CodeBrix packaging that turns its
 build output into NuGet packages.
 
-It produces one single-architecture package per supported Linux architecture:
+It produces one single-architecture package per supported Linux architecture,
+carrying the debugger that runs on the development machine:
 
     CodeBrix.Develop.Debug.LinuxX64      nuget/CodeBrix.Develop.Debug.LinuxX64/
     CodeBrix.Develop.Debug.LinuxArm64    nuget/CodeBrix.Develop.Debug.LinuxArm64/
 
-A third package, CodeBrix.Develop.Debug.LinuxRiscV64 (linux-riscv64), is
-planned once the RISC-V .NET toolchain matures; it would be built on RVA23
-hardware and follow exactly the same pattern.
+and one single-ABI package per supported Android ABI, carrying the debugger
+built to run ON an Android device (inside the debugged app's sandbox) to debug
+.NET 11 CoreCLR Android apps over an adb-forwarded Debug Adapter Protocol port:
 
-Consumer documentation for BOTH packages lives in the single root
-AGENT-README.txt. There is no per-package AGENT-README - both csproj files pack
+    CodeBrix.Develop.Debug.AndroidArm64  android/nuget/CodeBrix.Develop.Debug.AndroidArm64/  (arm64-v8a)
+    CodeBrix.Develop.Debug.AndroidX64    android/nuget/CodeBrix.Develop.Debug.AndroidX64/    (x86_64)
+
+The Android packages and everything needed to reproduce them live under
+android/ - see ANDROID PACKAGES below and android/README.md.
+
+A further package, CodeBrix.Develop.Debug.LinuxRiscV64 (linux-riscv64), is
+planned once the RISC-V .NET toolchain matures; it would be built on RVA23
+hardware and follow exactly the same pattern as the Linux pair.
+
+Consumer documentation for ALL FOUR packages lives in the single root
+AGENT-README.txt. There is no per-package AGENT-README - every csproj packs
 the root one.
 
 The package ids carry NO license suffix. That is a deliberate, user-chosen
@@ -59,10 +70,17 @@ REPOSITORY LAYOUT
     bin/                       cmake "make install" output - SHARED, see below
     build/                     cmake build tree (gitignored)
     .coreclr/, .dotnet/        auto-downloaded build dependencies (gitignored)
-    nuget/<PackageId>/         the two CodeBrix packaging projects
+    nuget/<PackageId>/         the two Linux CodeBrix packaging projects
       <PackageId>.csproj       packaging-only project (no managed output)
       build/<PackageId>.targets  the targets file that ships in the package
       README.md                the package's nuget.org readme
+    android/                   the Android debugging bundle: vendored pinned
+                               sources, per-ABI build scripts, committed
+                               prebuilt payload, proof scripts, the DAP probe,
+                               and android/nuget/<PackageId>/ - the two
+                               Android packaging projects (same three files
+                               each as the Linux ones). android/README.md is
+                               the runbook; android/NOTICE.txt the provenance.
     AGENT-README.txt           consumer documentation for BOTH packages
     MAINTAINER-README.txt      this file
     EXTRAS-README.txt          non-package content in the repository
@@ -70,12 +88,16 @@ REPOSITORY LAYOUT
     THIRD-PARTY-NOTICES.txt    packed into both packages
     icon-codebrix-128.png      packed into both packages
 
-This repository differs from upstream ONLY by the addition of the two
-nuget/ packaging projects and the CodeBrix repo-standard files (AGENT-README,
-MAINTAINER-README, EXTRAS-README, README-INDEX, the AI-agent pointer stubs,
-THIRD-PARTY-NOTICES.txt, icon-codebrix-128.png). Do NOT modify the C++/CMake
-source tree except by syncing from upstream - keeping the fork exact is a
-deliberate policy so upstream releases can be merged cleanly.
+This repository differs from upstream by the addition of the packaging
+projects (nuget/, android/nuget/), the CodeBrix repo-standard files
+(AGENT-README, MAINTAINER-README, EXTRAS-README, README-INDEX, the AI-agent
+pointer stubs, THIRD-PARTY-NOTICES.txt, icon-codebrix-128.png), the android/
+bundle, and a SMALL, DELIBERATE set of changes to the C++ source tree made for
+Android debugging (listed under ANDROID PACKAGES, "Source changes carried by
+the fork"). Do NOT modify the C++/CMake source tree beyond that list except by
+syncing from upstream - keeping the fork close to upstream is a deliberate
+policy so upstream releases can be merged cleanly; every fork change is
+commented in place so a merge conflict explains itself.
 
 
 BUILDING
@@ -226,7 +248,73 @@ compatibility. To re-baseline the minor number, change _VersionBaseYear in the
 csproj. The full explanation is in a comment block at the top of each csproj.
 
 Each architecture package is packed independently, so their date-stamped
-versions differ. That is expected and does not need reconciling.
+versions differ. That is expected and does not need reconciling. The Android
+packages use the identical scheme (MAJOR=3, same csproj comment block).
+
+
+ANDROID PACKAGES
+================
+The two Android packages carry the SAME debugger, cross-compiled with the NDK
+to run on the device itself. Everything needed to reproduce them is committed
+under android/ so a fresh clone can rebuild or re-pack them with no network:
+
+    android/dbgshim/            vendored dotnet/diagnostics subset + wrapper
+                                CMakeLists -> prebuilt/<abi>/libdbgshim.so
+    android/netcoredbg/         vendored CoreCLR header/IDL subset;
+                                build-netcoredbg-android.sh <abi> builds THIS
+                                repo's src/ with the NDK -> prebuilt/<abi>/
+                                netcoredbg (stripped); build-managed-helper.sh
+                                -> prebuilt/managed/ (ManagedPart + Roslyn,
+                                architecture-independent)
+    android/nuget/<PackageId>/  the packaging projects; each packs its ABI's
+                                netcoredbg + libdbgshim.so and its own copy of
+                                the managed helper into tools/android-<arch>/
+    android/scripts/pack-android-packages.sh
+                                verifies the prebuilt payload (right ELF
+                                machine; the six exported compat symbols) and
+                                packs one or both packages
+
+Prerequisites for a REBUILD (not for packing): NDK 29.0.14206865 at
+~/Android/Sdk/ndk/29.0.14206865 (or ANDROID_NDK_ROOT), cmake 3.31.x (NOT 4.x),
+a system `dotnet` on PATH. Packing needs only `dotnet` (and the NDK for the
+optional verification). Exact runbook: android/README.md.
+
+Where each package's payload lands in a consumer:
+    tools/android-arm64/  -> $(OutputPath)netcoredbg-android-arm64/
+    tools/android-x64/    -> $(OutputPath)netcoredbg-android-x64/
+Separate folders on purpose (unlike the Linux pair): an IDE references BOTH and
+chooses by the device's ro.product.cpu.abi at run time. Nothing is executed on
+the build machine, so the targets do no chmod; the consumer pushes the files to
+the device and chmods them there.
+
+The proof scripts (android/scripts/run-attach.sh, run-debug-session.sh,
+run-dap-session.sh) are the regression tests for a rebuilt payload: run
+run-dap-session.sh -n -s <serial> on an arm64-v8a AND an x86_64 device before
+packing, and expect ">>> ALL CHECKS PASSED" on both.
+
+Source changes carried by the fork (the ONLY C++ changes vs upstream; each is
+commented in place):
+  - src/CMakeLists.txt: Android (bionic) has no libpthread; adds
+    utils/android_compat.cpp and -Wl,--export-dynamic for ANDROID builds only.
+  - src/utils/android_compat.cpp (new, ANDROID only): the built-in Android
+    compatibility layer - exported interposers for kill/open/open64/openat/
+    __open_2/__openat_2 that (a) tolerate the SELinux-denied kill(pid,0)
+    liveness probe of the PAL inside libmscordbi.so, and (b) redirect failing
+    *.dll/*.pdb opens to the on-device assembly directory
+    (NETCOREDBG_ANDROID_ASSEMBLY_DIR). Replaces the LD_PRELOAD harness.
+  - src/managed/interop.cpp: when NETCOREDBG_ANDROID_ASSEMBLY_DIR is set, the
+    hosted (second) CoreCLR's TPA is built from that directory, where the
+    framework assemblies live on Android.
+  - src/protocols/vscodeprotocol.cpp: the per-request timeout can be raised
+    with NETCOREDBG_COMMAND_TIMEOUT_MS; plus the catch-all around the request
+    future (an escaping mscordbi HRException* becomes a failed request).
+  - src/metadata/modules.{h,cpp}, src/debugger/managedcallback.cpp,
+    src/debugger/evalwaiter.cpp, src/protocols/cliprotocol.cpp: the CoreLib
+    module-name fix (Android reports "System.Private.CoreLib" without ".dll")
+    and the NULL-notification-class guard; see android/README.md, "The one
+    bug that was fixed".
+All of these are inert on Linux (Android-only compilation, or env-var gated
+with the upstream default), so the Linux packages are unaffected.
 
 Keep the version scheme, the MAJOR=3 pin and the no-license-suffix package ids
 OUT of AGENT-README.txt - they are maintainer facts and consumers must not pin
@@ -287,10 +375,15 @@ CODING CONVENTIONS
 ==================
   - The C++/CMake tree follows UPSTREAM conventions, not CodeBrix ones. Do not
     apply CodeBrix C# conventions, file headers or naming to it, and do not
-    reformat it. The only acceptable reason to touch it is an upstream sync.
-  - The two csproj files are the CodeBrix-owned surface. Keep them identical
-    apart from the package id, the linux-<arch> path, the package tags and the
-    bin/-folder warning comment.
+    reformat it. The acceptable reasons to touch it are an upstream sync and
+    the Android changes listed under ANDROID PACKAGES (keep those minimal,
+    commented, and inert on Linux).
+  - The four csproj files are the CodeBrix-owned surface. Keep the two Linux
+    ones identical apart from the package id, the linux-<arch> path, the
+    package tags and the bin/-folder warning comment; keep the two Android
+    ones identical apart from the package id, the ABI/android-<arch> paths and
+    the package description. android/dap-probe/ is CodeBrix C# and follows the
+    CodeBrix conventions.
   - Documentation edits go to the root .txt files (AGENT-README,
     MAINTAINER-README, EXTRAS-README, README-INDEX). docs/ belongs to upstream.
   - NO version numbers in AGENT-README.txt at all -- not even in the upstream
@@ -306,15 +399,16 @@ CODING CONVENTIONS
 NOTES
 =====
   - The upstream sources support Windows, macOS, arm32, x86, riscv64 and
-    loongarch64. Only linux-x64 and linux-arm64 are packaged, so anything the
-    upstream README says about other platforms is background, not a package
-    promise.
+    loongarch64. Only linux-x64, linux-arm64, android-arm64 and android-x64
+    are packaged, so anything the upstream README says about other platforms
+    is background, not a package promise.
   - `git status` will show nuget/*/bin and nuget/*/obj as ignored build
     artifacts; previously packed .nupkg files can linger there. Confirm the
     version you are about to publish is the one you just built.
   - The vscode protocol implementation applies a 15-second timeout to every
-    queued request. If a change makes an operation slower than that, consumers
-    see "Command execution timed out." rather than a hang - check
+    queued request (overridable with NETCOREDBG_COMMAND_TIMEOUT_MS, a fork
+    addition). If a change makes an operation slower than that, consumers see
+    "Command execution timed out." rather than a hang - check
     src/protocols/vscodeprotocol.cpp before blaming a client.
 
 

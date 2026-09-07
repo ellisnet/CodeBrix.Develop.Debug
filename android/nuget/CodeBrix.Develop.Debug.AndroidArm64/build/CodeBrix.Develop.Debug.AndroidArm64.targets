@@ -1,0 +1,23 @@
+<Project>
+
+  <!--
+    Copies the on-device NetCoreDbg payload for Android arm64-v8a into the
+    consuming application's output folder (netcoredbg-android-arm64/ subfolder) on
+    every build and publish - no RuntimeIdentifier required. Nothing is
+    executed on this machine and no executable bit is needed: the files are
+    pushed to an Android device with adb and made executable there (see
+    android/README.md in the repository). The AndroidX64 package lands its
+    payload in netcoredbg-android-x64/, so both packages can be referenced at
+    once and the right one chosen by the device's ABI at run time.
+  -->
+
+  <ItemGroup>
+    <_NetCoreDbgArm64File Include="$(MSBuildThisFileDirectory)..\tools\android-arm64\**\*" />
+    <None Include="@(_NetCoreDbgArm64File)">
+      <Link>netcoredbg-android-arm64\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
+</Project>

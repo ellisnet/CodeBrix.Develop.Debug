@@ -194,6 +194,14 @@ if (NOT CLR_CMAKE_TARGET_TIZEN_LINUX)
     list(APPEND netcoredbg_SRC utils/logger.cpp)
 endif()
 
+# Android-only libc compatibility layer: interposed kill()/open() family that
+# replaces the LD_PRELOAD proof harness (android/harness/trace.c). See the file
+# header of utils/android_compat.cpp for what it does and which environment
+# variables switch it on. Nothing changes for non-Android builds.
+if (ANDROID)
+    list(APPEND netcoredbg_SRC utils/android_compat.cpp)
+endif()
+
 if (INTEROP_DEBUGGING)
     list(APPEND netcoredbg_SRC
             debugger/breakpoint_interop_rendezvous.cpp
@@ -251,6 +259,19 @@ else()
     if (EXISTS "${CORECLR_MINIPAL_SRC_DIR}/guid.c")
         target_link_libraries(netcoredbg minipalguid)
     endif()
+endif()
+
+# Android: the interposed libc entry points in utils/android_compat.cpp only
+# work if they are in the EXECUTABLE's dynamic symbol table -- bionic resolves
+# the symbols of every dlopen()ed library (libdbgshim.so, libmscordbi.so,
+# libmscordaccore.so, the hosted libcoreclr.so) against the global group first,
+# and the executable heads that group. Export exactly those six symbols (a
+# plain --export-dynamic would also export ~1700 statically linked libc++
+# symbols, which nothing needs and which could interpose on a loaded library).
+if (ANDROID)
+    foreach(_compat_symbol kill open open64 openat __open_2 __openat_2)
+        target_link_options(netcoredbg PRIVATE "-Wl,--export-dynamic-symbol=${_compat_symbol}")
+    endforeach()
 endif()
 
 if (NCDB_DOTNET_STARTUP_HOOK)

@@ -1,16 +1,27 @@
 ================================================================================
 AGENT-README: CodeBrix.Develop.Debug
-A Guide for AI Coding Agents — CONSUMING the CodeBrix.Develop.Debug.LinuxX64
-and .LinuxArm64 NuGet packages
+A Guide for AI Coding Agents — CONSUMING the CodeBrix.Develop.Debug.LinuxX64,
+.LinuxArm64, .AndroidArm64 and .AndroidX64 NuGet packages
 ================================================================================
 
 OVERVIEW
 ========
-These two NuGet packages carry the NetCoreDbg debugger for the .NET runtime as
-prebuilt native Linux binaries - one package per CPU architecture. There is no
-managed library in either package and no public C# API: referencing a package
+These NuGet packages carry the NetCoreDbg debugger for the .NET runtime as
+prebuilt native binaries - one package per CPU architecture. There is no
+managed library in any package and no public C# API: referencing a package
 drops a working debugger into your application's output folder, and your code
-starts it as a child process and talks to it over a protocol.
+starts it and talks to it over a protocol.
+
+Two kinds of package, same debugger:
+
+    Linux packages (.LinuxX64, .LinuxArm64)
+        The debugger runs on the machine your application runs on. Your code
+        starts it as a child process and speaks DAP over its stdio.
+    Android packages (.AndroidArm64, .AndroidX64)
+        The debugger runs ON AN ANDROID DEVICE, inside the sandbox of the .NET
+        11 (CoreCLR) Android app being debugged. Your code pushes it there with
+        adb, starts it in server mode, forwards the port, and speaks the SAME
+        DAP over TCP. See ANDROID PACKAGES: DEBUGGING ON THE DEVICE below.
 
 NetCoreDbg debugs .NET programs. It speaks three interfaces, selected by a
 command-line option when you start it:
@@ -35,22 +46,29 @@ INSTALLATION
 Package ids (they carry NO license suffix - a deliberate deviation from the
 CodeBrix family convention, shared by the other CodeBrix.Develop.* packages):
 
-    CodeBrix.Develop.Debug.LinuxX64      linux-x64 debugger binaries
-    CodeBrix.Develop.Debug.LinuxArm64    linux-arm64 debugger binaries
+    CodeBrix.Develop.Debug.LinuxX64      linux-x64 debugger binaries (host)
+    CodeBrix.Develop.Debug.LinuxArm64    linux-arm64 debugger binaries (host)
+    CodeBrix.Develop.Debug.AndroidArm64  on-device payload for arm64-v8a devices
+    CodeBrix.Develop.Debug.AndroidX64    on-device payload for x86_64 devices/emulators
 
     dotnet add package CodeBrix.Develop.Debug.LinuxX64
       -- or --
     dotnet add package CodeBrix.Develop.Debug.LinuxArm64
+      -- plus, to debug Android apps on devices --
+    dotnet add package CodeBrix.Develop.Debug.AndroidArm64
+    dotnet add package CodeBrix.Develop.Debug.AndroidX64
 
-NuGet dependencies: NONE. Neither package brings in any other package.
+NuGet dependencies: NONE. No package brings in any other package.
 
 License: MIT. The packaged third-party binaries are MIT except the Roslyn
-scripting DLLs, which are Apache-2.0 (they come from the Roslyn 2.x era, whose
-releases were Apache-2.0). Full provenance ships inside the package as
-THIRD-PARTY-NOTICES.txt.
+scripting DLLs, which are under the Microsoft .NET Library License (the
+licence their 2.x-era NuGet packages declare). Full provenance ships inside
+the package as THIRD-PARTY-NOTICES.txt.
 
 Requirements:
-  - Linux only. There is no Windows, macOS, riscv64, arm32 or x86 package.
+  - Linux hosts only for the Linux packages. There is no Windows, macOS,
+    riscv64, arm32 or x86 package. The Android packages are host-agnostic
+    files that are pushed to a device; using them needs adb on the host.
   - A .NET runtime must be installed on the machine where debugging happens.
     The debugger finds the CoreCLR of the process being debugged and loads its
     own managed helper (ManagedPart.dll) into that runtime.
@@ -60,17 +78,23 @@ Requirements:
 
 WHICH ONE DO I REFERENCE
 ------------------------
-Exactly ONE, matching the architecture of the machine your application will
-RUN on:
+Of the LINUX packages, exactly ONE, matching the architecture of the machine
+your application will RUN on:
 
     linux-x64    -> CodeBrix.Develop.Debug.LinuxX64
     linux-arm64  -> CodeBrix.Develop.Debug.LinuxArm64
 
-The packages are single-arch carriers on purpose. Each one's build/*.targets
-copies its binaries unconditionally and every package lands them at the SAME
-output path, so referencing two of them at once makes the two architectures
-fight over the same files. Pick one; see ARCHITECTURE SELECTION below for the
-conditional PackageReference that does the picking for you.
+The Linux packages are single-arch carriers on purpose. Each one's
+build/*.targets copies its binaries unconditionally and both land them at the
+SAME output path (netcoredbg/), so referencing two of them at once makes the
+two architectures fight over the same files. Pick one; see ARCHITECTURE
+SELECTION below for the conditional PackageReference that does the picking.
+
+Of the ANDROID packages, EITHER OR BOTH: they land in DIFFERENT output folders
+(netcoredbg-android-arm64/ and netcoredbg-android-x64/), and which one to push
+is decided at run time by the device's ABI (`adb shell getprop
+ro.product.cpu.abi` -> arm64-v8a or x86_64). A tool that must debug on phones
+AND on the Android Studio emulator references both.
 
 
 KEY NAMESPACES / USINGS
@@ -96,6 +120,13 @@ Inside the nupkg the binaries live under tools/linux-<arch>/ :
 
     tools/linux-x64/...      (CodeBrix.Develop.Debug.LinuxX64)
     tools/linux-arm64/...    (CodeBrix.Develop.Debug.LinuxArm64)
+    tools/android-arm64/...  (CodeBrix.Develop.Debug.AndroidArm64)
+    tools/android-x64/...    (CodeBrix.Develop.Debug.AndroidX64)
+
+The rest of this section describes the LINUX packages. The Android packages
+copy the same way but into netcoredbg-android-arm64/ or netcoredbg-android-x64/,
+do NO chmod (nothing runs on the build machine), and are covered in ANDROID
+PACKAGES: DEBUGGING ON THE DEVICE.
 
 The package's build/<PackageId>.targets file adds those files to the consuming
 project as linked None items with CopyToOutputDirectory=PreserveNewest, all
@@ -613,6 +644,136 @@ Useful when the debugger runs on another machine or in another container. Not
 combinable with --interpreter=cli.
 
 
+ANDROID PACKAGES: DEBUGGING ON THE DEVICE
+=========================================
+WHAT THEY ARE
+-------------
+A .NET 11 Android app runs on CoreCLR, and CoreCLR's debugging interface
+(ICorDebug) cannot be driven remotely - the debugger must run in the same
+place as the app. So the Android packages carry the SAME netcoredbg, built with
+the Android NDK for the device's ABI, plus its shim and managed helper:
+
+    netcoredbg-android-arm64/   (from CodeBrix.Develop.Debug.AndroidArm64)
+    netcoredbg-android-x64/     (from CodeBrix.Develop.Debug.AndroidX64)
+        netcoredbg                    the debugger, with an Android
+                                      compatibility layer built in
+        libdbgshim.so                 finds the app's runtime, loads mscordbi
+        ManagedPart.dll               symbol reader + expression evaluator
+        Microsoft.CodeAnalysis*.dll   (4) Roslyn, used by ManagedPart
+
+Your tool pushes that folder into the app's sandbox on the device, starts the
+debugger there in DAP server mode, forwards the port with adb, and then speaks
+exactly the DAP described above over TCP - attach instead of launch, because
+Android starts the app.
+
+PREREQUISITES ON THE DEBUGGED APP
+---------------------------------
+  - net11.0-android (CoreCLR). A .NET 10 Android app runs on MonoVM, which
+    this debugger cannot attach to.
+  - A DEBUG build installed with the SDK's Install target (fast deployment):
+    `dotnet build -c Debug -t:Install -p:AdbTarget="-s <serial>"`. That makes
+    the app debuggable and puts loose assemblies + the portable PDB on the
+    device under /data/data/<pkg>/files/.__override__/<abi>/. A raw
+    `adb install` of a Debug APK does neither.
+  - `run-as <pkg>` must work: a debuggable app on any device, or a Google-APIs
+    (not Play) emulator image.
+  - The PDB records the build machine's absolute source paths; send those
+    same paths in setBreakpoints and the debugger matches them.
+
+THE SEQUENCE (all verified on arm64-v8a and x86_64)
+---------------------------------------------------
+    1. ABI:      adb -s S shell getprop ro.product.cpu.abi      -> arm64-v8a | x86_64
+    2. Push the payload folder somewhere adb can write, then copy it INTO the
+       sandbox as the app's own uid (the debugger must run as that uid):
+         adb -s S push <payload>/. /data/local/tmp/codebrix-ncdbg
+         adb -s S shell run-as PKG sh -c 'mkdir -p /data/data/PKG/ncdbg &&
+             cp /data/local/tmp/codebrix-ncdbg/* /data/data/PKG/ncdbg/ &&
+             chmod 755 /data/data/PKG/ncdbg/netcoredbg'
+       (/data/local/tmp is noexec for the app uid; the sandbox copy is what runs.)
+    3. Mark the app as the debug app BEFORE launching it, so ActivityManager
+       does not ANR-kill it while it sits at a breakpoint:
+         adb -s S shell am set-debug-app --persistent PKG
+       (undo later with `am clear-debug-app`; applied to an already-running
+       app it RESTARTS the app, which is why it comes first.)
+    4. Launch the app FRESH and take its pid. A process that was debugged
+       before answers a new attach with a transport resync and the attach
+       times out, so always force-stop and relaunch:
+         adb -s S shell am force-stop PKG
+         adb -s S shell am start -n PKG/<activity>      (resolve the launcher
+             activity with `cmd package resolve-activity --brief PKG`)
+         adb -s S shell pidof PKG
+    5. Find the app's native-library directory (it holds libcoreclr.so; the
+       name is /data/app/.../lib/arm64 or .../lib/x86_64 - read it from the
+       process rather than guessing):
+         adb -s S shell run-as PKG cat /proc/<pid>/maps | grep -o '/data/app/[^ ]*/lib/[a-z0-9_]*' | sort -u
+    6. Start the debugger in server mode inside the sandbox, backgrounded,
+       with the environment the compatibility layer reads:
+         adb -s S shell run-as PKG sh -c 'cd /data/data/PKG/ncdbg && (
+             NETCOREDBG_ANDROID_ASSEMBLY_DIR=/data/data/PKG/files/.__override__/<abi>
+             NETCOREDBG_ANDROID_CLR_DIR=<libdir>
+             LD_LIBRARY_PATH=<libdir>
+             TMPDIR=/data/data/PKG/cache
+             NETCOREDBG_COMMAND_TIMEOUT_MS=60000
+             ./netcoredbg --interpreter=vscode --server=4711 > ncdbg.out 2>&1 &)'
+    7. Forward and connect:
+         adb -s S forward tcp:<hostPort> tcp:4711
+         TcpClient -> 127.0.0.1:<hostPort>   (retry briefly; the server may
+                                              still be starting)
+    8. DAP, attach flavour:
+         initialize -> attach {processId: <pid>} (send, do not wait)
+         -> initialized event -> setBreakpoints per file
+         -> configurationDone   <- the REAL attach happens inside this request
+                                   (about 250 ms on both device kinds)
+         -> attach response -> then stopped / stackTrace / scopes / variables /
+            evaluate / next / stepIn / stepOut / continue /
+            setExceptionBreakpoints exactly as in the local session.
+    9. End: disconnect {terminateDebuggee: false} detaches and leaves the app
+       running (true terminates it); the debugger exits after disconnect.
+       Then `adb forward --remove tcp:<hostPort>` and, when you are done
+       debugging that app, `am clear-debug-app`.
+
+THE ENVIRONMENT VARIABLES (the built-in Android compatibility layer)
+--------------------------------------------------------------------
+    NETCOREDBG_ANDROID_ASSEMBLY_DIR
+        The app's assembly directory (/data/data/<pkg>/files/.__override__/<abi>).
+        The runtime's debugging library opens managed assemblies and PDBs next
+        to libcoreclr.so, which on Android is a read-only APK folder holding
+        only .so files; when such an open fails, the debugger retries it here.
+        The debugger's own hosted runtime (which runs ManagedPart.dll) also
+        takes its framework assemblies from here. REQUIRED - without it the
+        attach fails with 0x80004005.
+    NETCOREDBG_ANDROID_CLR_DIR
+        The native-library directory of the app (from step 5). Informational
+        for the layer; LD_LIBRARY_PATH must point there too so the debugger's
+        hosted runtime finds libcoreclr.so's native companions.
+    NETCOREDBG_ANDROID_TRACE
+        Optional: a file path; the layer appends one line per redirect or
+        liveness-probe decision. Diagnostics only.
+    NETCOREDBG_COMMAND_TIMEOUT_MS
+        Optional (any platform): the per-request timeout, default 15000.
+        60000 is a safe value for device sessions.
+    TMPDIR
+        Must be writable by the app uid (/data/data/<pkg>/cache): the debug
+        transport and --log use it.
+    Always on, no variable: the liveness probe kill(pid, 0) that Android's
+    SELinux denies even between processes of the same uid is answered from
+    /proc/<pid> instead.
+
+WHAT WORKS ON THE DEVICE
+------------------------
+Attach; line breakpoints (set before or after attach; UI thread, thread-pool
+threads, loops, async continuations); stack traces with file:line for app
+frames (framework frames without); locals, fields, arrays, List<T>, full
+object expansion of `this`; arithmetic expressions; next / stepIn / stepOut;
+first-chance exception stops (setExceptionBreakpoints ["all"]) with
+exceptionInfo and the throw-site stack; detach leaving the app running.
+
+Known limitations (not Android-specific unless stated): string member access
+in expressions (`s.Length`) fails - use `s.get_Length()`; explicit METHOD-CALL
+evaluation (`x.ToString()`, `Foo.Bar(3)`) returns nothing on Android (works
+on Linux); `$exception` does not expand.
+
+
 MINIMUM VIABLE PROJECT
 ======================
 DebugHost.csproj
@@ -700,9 +861,23 @@ PERFORMANCE TIPS
 
 COMMON PITFALLS TO AVOID
 ========================
-  - Referencing BOTH architecture packages. They copy to the same
+  - Referencing BOTH Linux architecture packages. They copy to the same
     netcoredbg/ folder and will overwrite each other's files; the app then
     fails with an exec-format error at run time. Reference exactly one.
+    (The two ANDROID packages are the opposite case: separate folders, both
+    may be referenced.)
+  - Android: attaching to an app process that was debugged before. The
+    runtime's transport answers with a resync and the attach times out.
+    Force-stop and relaunch, then attach once.
+  - Android: calling `am set-debug-app` AFTER the app is running. It restarts
+    the app and the pid you captured is dead. Set it, THEN launch.
+  - Android: running the debugger from /data/local/tmp. That folder is
+    noexec for the app's uid; copy into /data/data/<pkg>/ncdbg with run-as.
+  - Android: omitting NETCOREDBG_ANDROID_ASSEMBLY_DIR. The attach fails with
+    0x80004005 because the runtime's debugging library cannot open the
+    framework assemblies next to libcoreclr.so.
+  - Android: using `adb install` for a Debug build. Fast deployment means the
+    APK has no assemblies; the app exits at startup. Use `-t:Install`.
   - Forgetting --interpreter. With stdin redirected, the default is GDB/MI,
     not DAP and not CLI.
   - Referencing the package from a class LIBRARY and expecting the app to get
@@ -749,9 +924,15 @@ COMMON PITFALLS TO AVOID
 WHAT THESE PACKAGES DO NOT DO
 =============================
   - No Windows and no macOS package. The upstream debugger builds on both, but
-    only linux-x64 and linux-arm64 are published here.
-  - No riscv64, arm32, x86, loongarch64 package. The upstream sources support
-    those architectures; no package carries them.
+    only linux-x64, linux-arm64, android-arm64 and android-x64 are published
+    here.
+  - No riscv64, arm32, x86, loongarch64 package, and no 32-bit Android ABI
+    (armeabi-v7a, x86). The upstream sources support those architectures; no
+    package carries them.
+  - No debugging of .NET 10 (MonoVM) Android apps, and no Mono soft-debugger
+    client. Only CoreCLR (.NET 11+) Android apps can be debugged.
+  - No adb, no device management, no app install. The Android packages are the
+    on-device payload; the tool that uses them drives adb itself.
   - No managed API, no wrapper, no types, no extension methods. Nothing to
     reference in C# code - the package's entire contract is "a working
     debugger appears at netcoredbg/netcoredbg in your output folder".
@@ -815,10 +996,21 @@ QUICK REFERENCE CARD
     Pick a package
       linux-x64                 CodeBrix.Develop.Debug.LinuxX64
       linux-arm64               CodeBrix.Develop.Debug.LinuxArm64
-      how many                  exactly one
+      how many (Linux)          exactly one
+      Android arm64-v8a         CodeBrix.Develop.Debug.AndroidArm64
+      Android x86_64            CodeBrix.Develop.Debug.AndroidX64
+      how many (Android)        either or both (separate folders)
 
     Path to the debugger
       Path.Combine(AppContext.BaseDirectory, "netcoredbg", "netcoredbg")
+      Android payload folders   netcoredbg-android-arm64/  netcoredbg-android-x64/
+
+    Android in one breath
+      set-debug-app -> force-stop -> am start -> pidof -> run-as sh -c
+      'NETCOREDBG_ANDROID_ASSEMBLY_DIR=... LD_LIBRARY_PATH=<libdir>
+       TMPDIR=<cache> ./netcoredbg --interpreter=vscode --server=4711 &'
+      -> adb forward tcp:H tcp:4711 -> initialize, attach{pid}, initialized,
+      setBreakpoints, configurationDone (does the attach) -> debug as usual
 
     Start it
       DAP over stdio            --interpreter=vscode
