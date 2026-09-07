@@ -1,0 +1,15 @@
+# Build image for the linux-x64 debugger binaries.
+#
+# The base is a manylinux image, pinned BY DIGEST: it is built on AlmaLinux 8
+# (glibc 2.28), which is what keeps the resulting netcoredbg runnable on older
+# distributions. Building on a modern desktop instead raises the glibc floor to
+# that desktop's glibc and silently drops support for every older distro - see
+# README.md in this folder.
+FROM quay.io/pypa/manylinux_2_28_x86_64@sha256:a61875a2f84cab7df8de222ff12cabc08ff86eb4ad402ac90ba7bdaed9600cca
+
+# clang   - the debugger does NOT build with gcc (upstream requirement)
+# cmake   - /usr/bin/cmake 3.26.5; see the cmake note in README.md
+# libicu  - REQUIRED by the .NET SDK: without it every dotnet invocation dies
+#           with "Couldn't find a valid ICU package installed on the system"
+RUN dnf -y install clang cmake make git libicu tar gzip which \
+ && dnf clean all

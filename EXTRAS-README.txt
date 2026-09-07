@@ -109,6 +109,29 @@ Not packed. Neither tool is required to build or use the packages.
             generrmessage XML-file [result-cpp-file] [result-h-file]
 
 
+container-build/ - CODEBRIX CONTAINER BUILDS OF THE SHIPPED BINARIES
+==================================================================
+Not packed, but it produces the files that ARE packed. Podman/manylinux builds
+of the debugger for both packaged architectures, so the published binaries carry
+a glibc 2.17 floor instead of the build host's. This is CodeBrix content, not
+upstream.
+
+    container-build/README.md
+        Why the container build exists, how to run it, and the traps
+        (libicu is mandatory, cmake 4.x must be avoided, a debugger cannot be
+        functionally tested under emulation).
+    container-build/Containerfile.x86_64, Containerfile.aarch64
+        Derived build images, manylinux bases pinned by digest.
+    container-build/build-debugger.sh
+        Builds the debugger for one architecture into output/linux-<arch>/.
+    container-build/pack-package.sh
+        Stages one architecture into bin/ and packs the matching package,
+        refusing to pack if bin/ holds the wrong architecture.
+    container-build/output/linux-x64/, output/linux-arm64/
+        The built binaries, COMMITTED (the root .gitignore re-includes them),
+        so a checkout can reproduce the published packages.
+
+
 packaging/ - UPSTREAM DISTRO PACKAGING AND BUILD INPUTS
 =======================================================
 Not packed, and unrelated to the NuGet packaging under nuget/.
@@ -135,6 +158,7 @@ OTHER NON-PACKAGE FILES
     .coreclr/ , .dotnet/       build dependencies auto-downloaded by cmake;
                                gitignored; do not read or edit them
     build/ , bin/              cmake build tree and install output; gitignored
+                               (container-build/output/ is the committed copy)
     .ahub/sam/exclude.txt      upstream static-analysis exclusion list
     .github/pull_request_template.md
                                upstream pull-request template

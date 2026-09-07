@@ -93,7 +93,14 @@ are gitignored.
 
 The build targets the architecture of the host it runs on: build on a linux-x64
 host for the x64 binaries, on a linux-arm64 host (for example a Raspberry Pi 5)
-for the arm64 binaries - the commands are identical. The installed artifacts
+for the arm64 binaries - the commands are identical.
+
+DO NOT use a bare host build for the PUBLISHED packages. A binary built this way
+inherits the build host's glibc, and a current desktop produces binaries that
+will not run on Ubuntu 22.04, Debian 12 or RHEL 8/9. Build the published
+binaries with container-build/ instead, which pins the floor to glibc 2.17 - see
+container-build/README.md. The host build above remains the right thing for
+day-to-day development and for running the test-suite. The installed artifacts
 land in <repo-root>/bin/, which is exactly the file set the packaging projects
 pack:
 
@@ -172,6 +179,12 @@ package that matches the architecture currently in bin/:
 
     cd nuget/CodeBrix.Develop.Debug.LinuxX64        # or .../LinuxArm64
     dotnet build -c Release
+
+For container-built binaries, use the packing script instead - it stages the
+requested architecture into bin/ and refuses to pack unless the binary there
+reports that same architecture, which is the SHARED bin/ FOLDER hazard below:
+
+    ./container-build/pack-package.sh x64           # or arm64
 
 Both projects set GeneratePackageOnBuild=true, so a plain build produces the
 .nupkg in that project's bin/Release/. Both also set IncludeBuildOutput=false

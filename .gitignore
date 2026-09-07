@@ -31,6 +31,12 @@ obj/
 # cross-build related files
 /.tools/
 
+# Container-built debugger binaries ARE committed: they are the exact files the
+# nuget/ packaging projects pack, and keeping them here makes the published
+# packages reproducible from a checkout. They must be re-included explicitly
+# because of the blanket *.so / *.dll rules above.
+!/container-build/output/**
+
 # GDB-related
 .gdb_history
 

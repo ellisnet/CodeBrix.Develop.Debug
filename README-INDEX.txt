@@ -22,6 +22,9 @@ MAINTAINER AND EXTRAS
       maintainers.
   EXTRAS-README.txt
       Samples, tools and other non-package content in this repository.
+  container-build/README.md
+      How the published debugger binaries are built in manylinux containers,
+      and why a plain host build must not be published.
 
 GENERAL
 -------
