@@ -1,21 +1,23 @@
-# Android arm64 debugging bundle
+# Android debugging bundle (arm64 + x64)
 
 Everything needed to reproduce, on a fresh clone on another machine, the three
-results proved on a Pixel 4 XL:
+results — proved on **both** an arm64 device (Pixel 4 XL) and an **x86_64**
+device (a Google-API emulator):
 
 - **Part 1** — build a Debug `.NET 11` Android app, deploy it, run it.
 - **Part 2** — place an on-device debugger and show it attaches and forms the
   live debug session ("dbgshim did its job").
-- **Part 3** — a **full interactive debug session on the phone**: breakpoints
+- **Part 3** — a **full interactive debug session on the device**: breakpoints
   bind and hit, backtrace with `file:line`, locals and object inspection,
   stepping, and first-chance exception stops.
 
-**On-device .NET 11 CoreCLR debugging works end to end.** This folder is
-self-contained: the source for every binary is vendored and pinned, and each
-binary is also committed prebuilt, so a fresh clone can either run the prebuilt
-pieces directly or rebuild them with no network and no moving dependency. The two
-things it does **not** include (by design) are the app being debugged and the
-.NET 11 SDK — see Prerequisites.
+**On-device .NET 11 CoreCLR debugging works end to end, on both arm64-v8a and
+x86_64.** This folder is self-contained: the source for every binary is vendored
+and pinned, and each binary is committed prebuilt for **both** ABIs, so a fresh
+clone can either run the prebuilt pieces directly or rebuild them with no network
+and no moving dependency. The scripts detect the device's ABI and pick the
+matching binaries automatically. The two things this folder does **not** include
+(by design) are the app being debugged and the .NET 11 SDK — see Prerequisites.
 
 The first half of this document is the runbook for Parts 1, 2 and 3. The second
 half is a compact **[Reference](#reference--how-it-works-and-the-android-specifics)**
@@ -34,20 +36,24 @@ android/
   dbgshim/
     CMakeLists.txt              wrapper that builds libdbgshim.so from the vendored source
     diagnostics-src/            pinned dotnet/diagnostics subset (dbgshim source)
-    build-dbgshim-android.sh    builds + refreshes prebuilt/libdbgshim.so
-    prebuilt/libdbgshim.so      prebuilt arm64 binary (ready to use)
+    build-dbgshim-android.sh    build [<abi>]; refreshes prebuilt/<abi>/libdbgshim.so
+    prebuilt/arm64-v8a/libdbgshim.so   prebuilt arm64 binary (ready to use)
+    prebuilt/x86_64/libdbgshim.so      prebuilt x64 binary  (ready to use)
   netcoredbg/
     coreclr-deps/               pinned CoreCLR header/IDL subset (coreclr/ + native/)
-    build-netcoredbg-android.sh builds netcoredbg from THIS repo's src/ against coreclr-deps
+    build-netcoredbg-android.sh build [<abi>] from THIS repo's src/ against coreclr-deps
     build-managed-helper.sh     builds + refreshes prebuilt/managed/ from THIS repo's src/managed/
-    prebuilt/netcoredbg         prebuilt arm64 binary (built WITH the CoreLib-name fix)
-    prebuilt/managed/           the managed helper pushed to the phone: ManagedPart.dll +
+    prebuilt/arm64-v8a/netcoredbg      prebuilt arm64 binary (built WITH the CoreLib-name fix)
+    prebuilt/x86_64/netcoredbg         prebuilt x64 binary  (built WITH the CoreLib-name fix)
+    prebuilt/managed/           the managed helper pushed to the device: ManagedPart.dll +
                                 the four Microsoft.CodeAnalysis*.dll (Roslyn) — the symbol
-                                reader + C# evaluator that run in netcoredbg's hosted runtime
+                                reader + C# evaluator that run in netcoredbg's hosted runtime.
+                                ARCHITECTURE-INDEPENDENT (netstandard2.0): one copy serves both ABIs
   harness/
     trace.c                     LD_PRELOAD helper (see the Reference)
-    build-harness.sh            builds + refreshes prebuilt/libtrace.so
-    prebuilt/libtrace.so        prebuilt arm64 binary (ready to use)
+    build-harness.sh            build [<abi>]; refreshes prebuilt/<abi>/libtrace.so
+    prebuilt/arm64-v8a/libtrace.so     prebuilt arm64 binary (ready to use)
+    prebuilt/x86_64/libtrace.so        prebuilt x64 binary  (ready to use)
   scripts/
     run-attach.sh               Part 2 in one command: place, attach, report the verdict
     run-debug-session.sh        Part 3 in one command: place debugger + managed helper,
@@ -55,9 +61,12 @@ android/
                                 breakpoint/stepping/locals/exception session, print a verdict
 ```
 
-The prebuilt binaries are the exact ones we ran; use them as-is, or rebuild any
-of them with the matching `build-*.sh` (each rebuild refreshes its `prebuilt/`
-file in place, and each was verified to build from the vendored source alone).
+Both run scripts detect the device's primary ABI (`ro.product.cpu.abi`) and use
+the matching `prebuilt/<abi>/` binaries; `<abi>` is `arm64-v8a` or `x86_64`. The
+prebuilt binaries are the exact ones we ran; use them as-is, or rebuild any with
+the matching `build-*.sh [<abi>]` (default `arm64-v8a`; each rebuild refreshes its
+`prebuilt/<abi>/` file in place, and each was verified to build from the vendored
+source alone). The managed helper is the same for both ABIs.
 The netcoredbg source is not vendored under `android/` — it is this repository's
 own `src/`, which the clone already has.
 
@@ -69,9 +78,14 @@ Exact versions we used are given so a second machine can match them; newer point
 releases will usually work, but the notes below call out where a version matters.
 
 ### Hardware / device
-- A **physical arm64 Android phone**, USB-connected, USB debugging (Developer
-  Options) on. We used a **Pixel 4 XL, Android 13 (API 33)**. `adb devices` must
-  list it. The device serial is passed to every script with `-s <serial>`.
+- An **arm64-v8a** or **x86_64** Android device that `adb devices` lists, with
+  USB debugging on (a physical phone) or a running emulator. The device serial is
+  passed to every script with `-s <serial>`. We verified on two:
+  a **Pixel 4 XL, Android 13 (API 33)** (arm64-v8a), and a **Google-API x86_64
+  emulator, API 37** (`sdk_gphone64_x86_64`). Use a **Google APIs** system image,
+  not a Play image — `run-as` (which the scripts rely on) only works on
+  debuggable/Google-API images. The `arm64` and `x86_64` builds are independent,
+  so an x86_64 emulator exercises the real x64 path, not arm64-via-translation.
 
 ### For Parts 2 and 3 (building/running the debugger pieces)
 - **Android platform-tools** (`adb`) on PATH.
@@ -167,8 +181,13 @@ Notes:
   debuggable and puts loose assemblies + the PDB on the device.
 - `-t:Install` uses fast deployment: assemblies land under the app's data dir,
   not inside the APK.
+- The **same command works for an x86_64 device/emulator** — `-t:Install`
+  detects the target's ABI and deploys the matching assemblies. On x64 the
+  runtime and loose assemblies land under the `x86_64` ABI dir instead of
+  `arm64-v8a`; the verify commands below adjust accordingly.
 
-Verify it really is a Debug build **on the device** (all three should hold):
+Verify it really is a Debug build **on the device** (all three should hold; swap
+`arm64-v8a`→`x86_64` and `arm64`→`x86_64` on an x64 device):
 
 - `adb -s <serial> shell dumpsys package com.codebrix.simpledebugapp | grep flags`
   shows `DEBUGGABLE`.
@@ -183,9 +202,9 @@ Verify it really is a Debug build **on the device** (all three should hold):
 
 ---
 
-## Part 2 — attach on the phone and prove dbgshim works
+## Part 2 — attach on the device and prove dbgshim works
 
-One command (uses the prebuilt binaries):
+One command (detects the device ABI, uses the matching prebuilt binaries):
 
 ```bash
 android/scripts/run-attach.sh -s <serial>
@@ -193,9 +212,11 @@ android/scripts/run-attach.sh -s <serial>
 
 It places `netcoredbg` + `libdbgshim.so` + `libtrace.so` into the app's own
 directory (via `run-as`, so they run as the app uid), restarts the app fresh,
-attaches, and prints a verdict. Success looks like:
+attaches, and prints a verdict. Success looks like (the `(x86_64)` tag is the
+detected ABI):
 
 ```
+==================== dbgshim VERDICT (arm64-v8a) ====================
 SessionAccept (type 1) received : YES
 GetDCB (type 8) exchange        : YES
 MT_WriteMemory (type 7) rounds  : 18
@@ -213,8 +234,8 @@ process (see the Reference for why).
 
 ## Part 3 — full on-device debugging works
 
-One command reproduces the whole session (uses the prebuilt binaries + the
-managed helper):
+One command reproduces the whole session (detects the ABI; uses the matching
+prebuilt binaries + the managed helper):
 
 ```bash
 android/scripts/run-debug-session.sh -s <serial>
@@ -227,7 +248,7 @@ scripted breakpoint / stepping / locals / expression / exception session over a
 FIFO. Success looks like:
 
 ```
-==================== Part 3 VERDICT ====================
+==================== Part 3 VERDICT (arm64-v8a) ====================
 attach completed (symbols loaded + stopped)      : YES
 line breakpoint bound                            : YES
 breakpoint hit                                   : YES
@@ -235,13 +256,17 @@ backtrace with file:line                         : YES
 variable / expression printed                    : YES
 stepping (end stepping range)                    : YES
 func-eval (print this expanded the object)       : YES
+first-chance exception stop                      : YES
 ```
 
-Pass `-P <plan-file>` to drive your own command plan (the plan format is
-documented at the top of `run-debug-session.sh`); the built-in plan targets the
-sample app and the Pixel 4 XL button layout.
+The identical verdict (all YES) is produced on both the arm64-v8a Pixel and the
+x86_64 emulator by this same command. Pass `-P <plan-file>` to drive your own
+command plan (the plan format is documented at the top of `run-debug-session.sh`).
+The built-in plan taps the sample app's buttons by their resource-id
+(`tapid count_button`), computed from their on-screen bounds, so it works
+unchanged on any screen size or orientation.
 
-### What works (all confirmed on the device)
+### What works (all confirmed on the device, on both ABIs)
 
 - **attach completes** on a FRESH app process (symbols load, process stops).
 - **line breakpoints bind** (`info break` shows `Rslvd=y`) and **hit** — on the
@@ -270,7 +295,7 @@ exact string `"System.Private.CoreLib.dll"`, but CoreCLR on Android reports that
 module by simple name with no path and no `.dll`, so the cross-thread-dependency
 notification class was never set up and the first func-eval passed NULL into
 mscordbi, which threw an `HRException*` (by pointer) that nothing caught. Fixed in
-this repo's C++ source and rebuilt into `netcoredbg/prebuilt/netcoredbg`:
+this repo's C++ source and rebuilt into `netcoredbg/prebuilt/<abi>/netcoredbg` for both ABIs:
 
 - `IsSameModuleName()` (`src/metadata/modules.{h,cpp}`) compares module names
   treating a missing `.dll` as equal; used in the CoreLib check
@@ -314,14 +339,20 @@ this repo's C++ source and rebuilt into `netcoredbg/prebuilt/netcoredbg`:
 
 ---
 
-## Rebuilding from source (each script refreshes its `prebuilt/` file)
+## Rebuilding from source (each script refreshes its `prebuilt/<abi>/` file)
+
+Each native build script takes an ABI argument, default `arm64-v8a`:
 
 ```bash
-android/dbgshim/build-dbgshim-android.sh        # -> prebuilt/libdbgshim.so   (NDK + cmake)
-android/harness/build-harness.sh                # -> prebuilt/libtrace.so     (NDK)
-android/netcoredbg/build-netcoredbg-android.sh  # -> prebuilt/netcoredbg      (NDK + cmake + system dotnet)
-android/netcoredbg/build-managed-helper.sh      # -> prebuilt/managed/*.dll   (system dotnet)
+# arm64-v8a (default)                            # x86_64
+android/dbgshim/build-dbgshim-android.sh         android/dbgshim/build-dbgshim-android.sh x86_64
+android/harness/build-harness.sh                 android/harness/build-harness.sh x86_64
+android/netcoredbg/build-netcoredbg-android.sh   android/netcoredbg/build-netcoredbg-android.sh x86_64
+android/netcoredbg/build-managed-helper.sh   # architecture-independent; run once, serves both ABIs
 ```
+
+Requirements per script: dbgshim/harness need the NDK; netcoredbg needs the NDK +
+cmake + a system `dotnet`; the managed helper needs only `dotnet`.
 
 `netcoredbg` is built from this repository's own `src/` (which carries the Part-3
 fix); the other three build from the vendored source / `src/managed/` in this
@@ -332,9 +363,11 @@ repository-root `THIRD-PARTY-NOTICES.txt`.
 
 # Reference — how it works, and the Android specifics
 
-Verified on a Pixel 4 XL (Android 13 / API 33) against `com.codebrix.simpledebugapp`
-(`net11.0-android37.0`). This is the minimum a future session needs to understand,
-extend, or productionize the pieces above.
+Verified on a Pixel 4 XL (Android 13 / API 33, arm64-v8a) and a Google-API x86_64
+emulator (API 37), against `com.codebrix.simpledebugapp` (`net11.0-android37.0`).
+This is the minimum a future session needs to understand, extend, or productionize
+the pieces above. Paths below use the arm64 ABI names; on x86_64 substitute the
+ABI (see "Two ABI naming conventions" in the device fact sheet).
 
 ## The cast — every piece and where it runs
 
@@ -344,13 +377,13 @@ extend, or productionize the pieces above.
 | `libcoreclr.so` | the app's .NET 11 runtime | phone | ships in the APK |
 | `libmscordbi.so` | ICorDebug engine (the "right side" / RS) | phone | ships in the APK |
 | `libmscordaccore.so` | the DAC — reads runtime data structures out of the debuggee | phone | ships in the APK |
-| `netcoredbg` | the debugger executable (C++), an ICorDebug/dbgshim client | phone | this repo (built for android-arm64) |
+| `netcoredbg` | the debugger executable (C++), an ICorDebug/dbgshim client | phone | this repo (built per device ABI: arm64-v8a + x86_64) |
 | `libdbgshim.so` | bootstrap shim: finds the runtime, loads mscordbi, hands back ICorDebug | phone | vendored + built here |
 | `ManagedPart.dll` + Roslyn | netcoredbg's MANAGED brain: PDB symbol reading + C# expression eval | phone | this repo's `src/managed/` |
 | `libtrace.so` | the LD_PRELOAD harness (kill-mask + path redirects + trace) | phone | `harness/` (proof only) |
 | The IDE / DAP client | CodeBrix.Develop, connects over an adb-forwarded port | **host** | CodeBrix.Develop (Parts 4-5) |
 
-The non-obvious fact: **the debugger runs on the phone, not the laptop.**
+The non-obvious fact: **the debugger runs on the device (phone or emulator), not the laptop.**
 ICorDebug cannot be called remotely, so the ICorDebug client (mscordbi, driven by
 netcoredbg) must live with the debuggee. The laptop only ever talks to netcoredbg
 over a forwarded port via the Debug Adapter Protocol (that wiring is Parts 4-5).
@@ -466,10 +499,19 @@ last-seen id instead of `MT_SessionAccept` (fact 2).
 - Debugger dir on device: `/data/data/<pkg>/ncdbg/` (the scripts push to
   `/data/local/tmp/ncdbg` then `run-as <pkg> cp` into the sandbox and `chmod 755`
   the binary — `/data/local/tmp` is noexec for the app uid).
-- Framework + PDB on device: `/data/data/<pkg>/files/.__override__/arm64-v8a/`
-  and `/data/local/tmp/fastdeploy2/<pkg>/0/arm64-v8a/`.
+- Framework + PDB on device: `/data/data/<pkg>/files/.__override__/<abi>/`
+  and `/data/local/tmp/fastdeploy2/<pkg>/0/<abi>/`.
 - Attach must be to a FRESH process; mark the app as the debug app so it is not
-  ANR-killed at a breakpoint.
+  ANR-killed at a breakpoint. (`am set-debug-app` must run BEFORE the fresh
+  launch — applied to a running app it restarts the process and orphans the pid.)
+
+**Two ABI naming conventions on the device** (the scripts handle both; know them
+if you extend the paths). The device's primary ABI is `ro.product.cpu.abi`:
+`arm64-v8a` or `x86_64`. The `.__override__` and `fastdeploy2` assembly dirs are
+named by that FULL ABI (`arm64-v8a`, `x86_64`). But the extracted native-lib dir
+under `/data/app/.../lib/` uses the SHORT name: `arm64` for arm64-v8a, `x86_64`
+for x86_64. The scripts derive the lib dir straight from the process's
+`/proc/<pid>/maps` rather than assuming a name, so they are ABI-agnostic.
 
 ## Sources
 
@@ -496,7 +538,7 @@ work along is the Android-specific method-call func-eval limitation (a later
 part), which does not block the Part 4/5 integration.
 
 The end goal: **in CodeBrix.Develop, open a solution with a .NET 11 CoreCLR
-Android app, hit Debug once, and get full line-by-line debugging on the phone —
+Android app, hit Debug once, and get full line-by-line debugging on the device —
 breakpoints set in the editor bind and get hit, call stack and locals populate,
 stepping and watches work.**
 
@@ -511,7 +553,7 @@ and breadth.
 Two framing notes:
 - **The on-device debugger is a black box to the IDE.** Part 3 settled its
   internals (C++ netcoredbg + the hosted ManagedPart, working on Android). Parts
-  4+ treat it as "a process that exposes a DAP server on the phone," so the
+  4+ treat it as "a process that exposes a DAP server on the device," so the
   roadmap does not depend on those internals.
 - **Workarounds ride along.** Parts 4-5 inherit the four Android workarounds from
   Part 2/3. They can stay the `LD_PRELOAD` stopgap until Part 6 makes them real,
@@ -520,7 +562,7 @@ Two framing notes:
 ## Part 4 — Remote debugging over the wire (device <-> off-device DAP, no IDE yet)
 
 **Definition of done:** From the laptop, using a *plain* DAP client (a test
-harness or stock VS Code), connect to the debugger running on the phone and do a
+harness or stock VS Code), connect to the debugger running on the device and do a
 full session: set a breakpoint before the code runs, see it bind and get hit,
 view the call stack with `file:line`, inspect locals, add a watch, and step
 (in/over/out).
@@ -592,8 +634,9 @@ held together by an `LD_PRELOAD` shim.
   left from Part 3, so watches and Immediate-window method calls work.
 - **Launch, not just attach** — start the app *under* the debugger so you can
   break in `OnCreate`/startup, not only attach to a running app.
-- **The version and RID matrix** — other .NET versions, and arm64 emulators / x64
-  devices, not just the one Pixel.
+- **The version and RID matrix** — arm64-v8a and x86_64 are both covered now;
+  remaining breadth is other .NET versions and a physical x64 device (only an
+  x86_64 emulator has been exercised so far).
 - **Richer breakpoints** — conditional and hit-count breakpoints, exception
   breakpoints (uncaught / "just my code" beyond the working first-chance stop).
 - **Nice-to-haves** — Hot Reload, edit-and-continue where feasible, and CI that

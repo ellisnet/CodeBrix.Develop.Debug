@@ -42,12 +42,14 @@ FIRST-PARTY files in this folder (this repository, MIT — not third-party):
      netcoredbg/build-managed-helper.sh, harness/build-harness.sh   build scripts
    - harness/trace.c                 the LD_PRELOAD proof harness (-> libtrace.so)
    - scripts/run-attach.sh, scripts/run-debug-session.sh            run drivers
-   - netcoredbg/prebuilt/netcoredbg  our android-arm64 build of the netcoredbg in
-                                     this repo's src/ (MIT)
-   - dbgshim/prebuilt/libdbgshim.so  our android-arm64 build of item 1 (MIT)
-   - harness/prebuilt/libtrace.so    our build of harness/trace.c (MIT)
+   - netcoredbg/prebuilt/<abi>/netcoredbg    our build of the netcoredbg in this
+                                             repo's src/ (MIT)
+   - dbgshim/prebuilt/<abi>/libdbgshim.so    our build of item 1 (MIT)
+   - harness/prebuilt/<abi>/libtrace.so      our build of harness/trace.c (MIT)
+     where <abi> is arm64-v8a and x86_64 (one prebuilt per supported device ABI;
+     all built from the same in-repo source, just cross-compiled for each arch).
 
 netcoredbg itself is the parent repository (CodeBrix.Develop.Debug, a fork of
 Samsung's netcoredbg, MIT). Its source is NOT vendored here — it is the repo you
-cloned; the android-arm64 binary is provided prebuilt and is rebuilt by
-netcoredbg/build-netcoredbg-android.sh.
+cloned; the per-ABI binaries are provided prebuilt and are rebuilt by
+netcoredbg/build-netcoredbg-android.sh <abi>.
