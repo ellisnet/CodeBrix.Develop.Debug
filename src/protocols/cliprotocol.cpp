@@ -2613,7 +2613,23 @@ HRESULT CLIProtocol::execCommands(LineReader&& lr, bool printCommands)
             while (tokenizer.Next(result))
                args.push_back(result);
 
-            hr = (this->*func)(str, args, output);
+            // Nothing below this point catches C++ exceptions, and mscordbi reports some argument
+            // errors by THROWING (its internal HRException*, not an HRESULT); one escaping here
+            // used to abort the whole debugger. Turn it into a failed command instead.
+            try
+            {
+                hr = (this->*func)(str, args, output);
+            }
+            catch (const std::exception &e)
+            {
+                output = std::string("error: unhandled exception while executing the command: ") + e.what();
+                hr = E_FAIL;
+            }
+            catch (...)
+            {
+                output = "error: unhandled exception while executing the command";
+                hr = E_FAIL;
+            }
             have_result = true;
         };
 

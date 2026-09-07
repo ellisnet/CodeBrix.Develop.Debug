@@ -83,6 +83,10 @@ https://github.com/ellisnet/CodeBrix.Develop.Debug/issues
               .Scripting.Common)
    Version:   2.3.0. ManagedPart.csproj pins "[2.3,)", which NuGet resolves to
               the 2.3.0 packages; confirmed in ManagedPart.deps.json.
+   Where:     next to the debugger binary in the NuGet packages, AND a second
+              copy under android/netcoredbg/prebuilt/managed/ -- the payload
+              the Android bundle pushes onto the phone next to netcoredbg so
+              its ManagedPart (symbol reader + evaluator) can run there.
    Authors:   Microsoft Corporation
    License:   MICROSOFT .NET LIBRARY LICENSE — this is the license the 2.3.0
               NuGet packages THEMSELVES declare, and it governs the binaries
@@ -105,7 +109,11 @@ https://github.com/ellisnet/CodeBrix.Develop.Debug/issues
 4. Vendored source under android/ (Android arm64 debugging bundle)
 
    The android/ folder vendors small, pinned SOURCE subsets so the Android
-   debugger pieces build with no network and no moving dependency. Every
+   debugger pieces build with no network and no moving dependency. (It also
+   carries prebuilt BINARIES: netcoredbg, libdbgshim.so and libtrace.so built
+   from this repository, ManagedPart.dll built from src/managed/ -- all MIT,
+   item 1 -- and the four Roslyn 2.3.0 assemblies covered by item 3 above.)
+   Every
    vendored file retains its original per-file header
    ("Licensed to the .NET Foundation ... under the MIT license"). All of it is
    MIT, (c) Microsoft Corporation / .NET Foundation and Contributors; the MIT

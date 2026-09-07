@@ -308,7 +308,8 @@ HRESULT STDMETHODCALLTYPE ManagedCallback::LoadModule(ICorDebugAppDomain *pAppDo
     m_debugger.m_sharedBreakpoints->ManagedCallbackLoadModuleAll(pModule);
 
     // enable Debugger.NotifyOfCrossThreadDependency after System.Private.CoreLib.dll loaded (trigger for 1 time call only)
-    if (module.name == "System.Private.CoreLib.dll")
+    // Note, on Android CoreCLR reports this module as "System.Private.CoreLib" (no path, no extension).
+    if (IsSameModuleName(module.name, "System.Private.CoreLib.dll"))
     {
         m_debugger.m_sharedEvalWaiter->SetupCrossThreadDependencyNotificationClass(pModule);
         m_debugger.m_sharedEvalStackMachine->FindPredefinedTypes(pModule);

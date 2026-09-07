@@ -650,5 +650,8 @@ OPTIONS IF CLEAN MIT LICENSING IS WANTED
      This is a FUNCTIONAL change to the evaluator and must be built and tested
      (API differences between Roslyn 2.3 and 4.x scripting); not a doc-only edit.
 
-NOTE: none of this concerns the android/ folder — that bundle contains no Roslyn.
+NOTE: the android/ bundle ships the SAME four Roslyn 2.3.0 assemblies under
+android/netcoredbg/prebuilt/managed/ (pushed onto the phone next to netcoredbg
+so ManagedPart can run there), so whatever is decided here applies to that
+copy too. THIRD-PARTY-NOTICES.txt item 3 records both locations.
 ================================================================================

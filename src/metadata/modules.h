@@ -23,6 +23,12 @@ namespace netcoredbg
 
 HRESULT GetModuleId(ICorDebugModule *pModule, std::string &id);
 std::string GetModuleFileName(ICorDebugModule *pModule);
+// Compares the file-name part of a module name or path with `name`, treating a missing
+// ".dll" extension on either side as equal. CoreCLR reports some modules by simple name
+// only: on Android, System.Private.CoreLib arrives as "System.Private.CoreLib" with no
+// directory and no extension, so an exact match against "System.Private.CoreLib.dll"
+// silently fails.
+bool IsSameModuleName(const std::string &moduleNameOrPath, const std::string &name);
 HRESULT IsModuleHaveSameName(ICorDebugModule *pModule, const std::string &Name, bool isFullPath);
 
 struct ModuleInfo

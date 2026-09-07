@@ -328,6 +328,14 @@ HRESULT EvalWaiter::SetupCrossThreadDependencyNotificationClass(ICorDebugModule 
 
 HRESULT EvalWaiter::SetEnableCustomNotification(ICorDebugProcess *pProcess, BOOL fEnable)
 {
+    // ICorDebugProcess3::SetEnableCustomNotification() validates its class argument by throwing
+    // (mscordbi has no try/catch on that path), so a null class would take the whole debugger
+    // down with "uncaught exception of type HRException*" instead of returning an error.
+    // Without the class, func-evals still run; only the cross-thread-dependency notification
+    // is unavailable.
+    if (!m_iCorCrossThreadDependencyNotification)
+        return E_FAIL;
+
     HRESULT Status;
     ToRelease<ICorDebugProcess3> pProcess3;
     IfFailRet(pProcess->QueryInterface(IID_ICorDebugProcess3, (LPVOID*) &pProcess3));

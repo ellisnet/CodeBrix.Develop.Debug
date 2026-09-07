@@ -25,6 +25,10 @@ MAINTAINER AND EXTRAS
   container-build/README.md
       How the published debugger binaries are built in manylinux containers,
       and why a plain host build must not be published.
+  android/README.md
+      The Android arm64 debugging bundle: runbook for building, deploying and
+      debugging a .NET 11 CoreCLR Android app on a phone with this debugger,
+      plus the full research record behind it.
 
 GENERAL
 -------

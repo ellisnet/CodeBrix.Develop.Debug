@@ -220,6 +220,22 @@ static std::string GetFileName(const std::string &path)
     return i == std::string::npos ? path : path.substr(i + 1);
 }
 
+bool IsSameModuleName(const std::string &moduleNameOrPath, const std::string &name)
+{
+    static const std::string dllExtension = ".dll";
+    auto simpleName = [](const std::string &value) -> std::string
+    {
+        std::string result = GetFileName(value);
+        if (result.size() > dllExtension.size() &&
+            result.compare(result.size() - dllExtension.size(), dllExtension.size(), dllExtension) == 0)
+        {
+            result.erase(result.size() - dllExtension.size());
+        }
+        return result;
+    };
+    return simpleName(moduleNameOrPath) == simpleName(name);
+}
+
 HRESULT IsModuleHaveSameName(ICorDebugModule *pModule, const std::string &Name, bool isFullPath)
 {
     HRESULT Status;
@@ -234,7 +250,11 @@ HRESULT IsModuleHaveSameName(ICorDebugModule *pModule, const std::string &Name, 
     else
         modName = GetBasename(to_utf8(szModuleName));
 
-    return modName == Name ? S_OK : S_FALSE;
+    // Exact match for full paths; a module reported by simple name (no ".dll") must still
+    // match its conventional file name, see IsSameModuleName().
+    if (isFullPath)
+        return modName == Name ? S_OK : S_FALSE;
+    return IsSameModuleName(modName, Name) ? S_OK : S_FALSE;
 }
 
 HRESULT Modules::GetModuleInfo(CORDB_ADDRESS modAddress, ModuleInfoCallback cb)
@@ -659,7 +679,7 @@ HRESULT Modules::GetModuleWithName(const std::string &name, ICorDebugModule **pp
         if (onlyWithPDB && mdInfo.m_symbolReaderHandles.empty())
             continue;
 
-        if (GetFileName(path) == name)
+        if (IsSameModuleName(path, name))
         {
             mdInfo.m_iCorModule->AddRef();
             *ppModule = mdInfo.m_iCorModule;

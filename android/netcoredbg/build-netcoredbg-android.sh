@@ -33,7 +33,10 @@ cmake -S "$REPO" -B "$BUILD" \
   -DCLR_CMAKE_HOST_ARCH=arm64 -DCLR_CMAKE_TARGET_ARCH=arm64
 cmake --build "$BUILD" --target netcoredbg -j"$(nproc)"
 echo "=== built: $BUILD/src/netcoredbg"; ls -la "$BUILD/src/netcoredbg"
+cp "$BUILD/src/netcoredbg" "$HERE/prebuilt/netcoredbg"
+echo "=== refreshed $HERE/prebuilt/netcoredbg"
 
-# ManagedPart.dll + Roslyn (netcoredbg's managed symbol reader) come from a
-# normal host build of netcoredbg; they are NOT needed to prove the Part-2
-# dbgshim attach, only for later parts. See ../README.md.
+# This build is the NATIVE debugger only (-DBUILD_MANAGED=OFF). The managed helper
+# (ManagedPart.dll + Roslyn) is built separately by ./build-managed-helper.sh and
+# lives in ./prebuilt/managed/. Part 2 (the dbgshim attach proof) does not need it;
+# Part 3 (a real debug session) does. See ../README.md.

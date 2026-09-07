@@ -1003,7 +1003,25 @@ void VSCodeProtocol::CommandsWorker()
             Status = COR_E_TIMEOUT;
         }
         else
-            Status = future.get();
+        {
+            // The request ran on another thread; an exception it threw (including mscordbi's own
+            // HRException* for a bad argument, which nothing below catches) is re-thrown here by
+            // future.get() and would otherwise take the debugger down. Report it as a failed request.
+            try
+            {
+                Status = future.get();
+            }
+            catch (const std::exception &e)
+            {
+                body["message"] = std::string("Unhandled exception while executing the request: ") + e.what();
+                Status = E_FAIL;
+            }
+            catch (...)
+            {
+                body["message"] = "Unhandled exception while executing the request.";
+                Status = E_FAIL;
+            }
+        }
 
         if (SUCCEEDED(Status))
         {

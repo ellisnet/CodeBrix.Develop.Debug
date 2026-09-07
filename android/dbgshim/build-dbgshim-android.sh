@@ -32,5 +32,7 @@ cmake --build "$BUILD" -j"$(nproc)"
 SO="$BUILD/dbgshim/libdbgshim.so"
 echo "=== built: $SO"
 ls -la "$SO"
+cp "$SO" "$HERE/prebuilt/libdbgshim.so"
+echo "=== refreshed $HERE/prebuilt/libdbgshim.so"
 echo "=== exported symbols (expect 18):"
 "$NDK"/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm -D --defined-only "$SO" 2>/dev/null | grep ' T ' | wc -l || true
