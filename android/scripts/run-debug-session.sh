@@ -28,7 +28,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
-SERIAL=""; PKG="com.codebrix.simpledebugapp"; ACT_SUFFIX=".MainActivity"; PLAN=""; HARNESS=0
+SERIAL=""; PKG="com.codebrix.simpledebugapp_net11"; ACT_SUFFIX=".MainActivity"; PLAN=""; HARNESS=0
 while getopts "s:p:P:t" o; do case $o in s) SERIAL="-s $OPTARG";; p) PKG="$OPTARG";; P) PLAN="$OPTARG";; t) HARNESS=1;; esac; done
 
 A(){ adb $SERIAL "$@" </dev/null; }

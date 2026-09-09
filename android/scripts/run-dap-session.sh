@@ -21,7 +21,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
-SERIAL=""; PKG="com.codebrix.simpledebugapp"; ACT_SUFFIX=".MainActivity"
+SERIAL=""; PKG="com.codebrix.simpledebugapp_net11"; ACT_SUFFIX=".MainActivity"
 SRCDIR="$HOME/GitHome/CodeBrix.Android/samples/SimpleDebugApp_API_37"
 HOSTPORT=4711; DEVPORT=4711; NATIVE=1
 while getopts "s:p:d:H:D:nt" o; do case $o in s) SERIAL="-s $OPTARG";; p) PKG="$OPTARG";; d) SRCDIR="$OPTARG";; H) HOSTPORT="$OPTARG";; D) DEVPORT="$OPTARG";; n) NATIVE=1;; t) NATIVE=0;; esac; done

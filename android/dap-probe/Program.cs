@@ -56,7 +56,7 @@ sealed class ProbeOptions
     public int Port;
     public int ProcessId;
     public string Serial = "";
-    public string Package = "com.codebrix.simpledebugapp";
+    public string Package = "com.codebrix.simpledebugapp_net11";
     public string SourceDirectory = "";
     public string Transcript = "";
     public int ConnectTimeoutSeconds = 30;

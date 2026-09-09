@@ -19,8 +19,8 @@
 # the host runtime's assembly probes there). Roslyn is the exception because it is
 # a NuGet package, not part of the framework, so it must travel with the debugger.
 #
-# Requirements: a `dotnet` on PATH. The SYSTEM .NET 10 SDK (10.0.400) is fine;
-# the .NET 11 preview is NOT needed to build this. No NDK, no device.
+# Requirements: a `dotnet` on PATH. The SYSTEM .NET 10 SDK (10.0.401) is fine;
+# the .NET 11 SDK is NOT needed to build this. No NDK, no device.
 #
 # Output: ./prebuilt/managed/{ManagedPart,Microsoft.CodeAnalysis[.CSharp][.Scripting]}.dll
 set -euo pipefail

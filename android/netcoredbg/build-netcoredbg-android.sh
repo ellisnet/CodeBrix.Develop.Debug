@@ -18,7 +18,7 @@
 # build needs NO network and does NOT clone the 1.2 GB dotnet/runtime.
 # Requirements: NDK 29.0.14206865, cmake 3.31.x (NOT 4.x), and a system `dotnet`
 # on PATH (the tiny generrmsg tool is built with it; the SYSTEM .NET 10 SDK is
-# fine -- the .NET 11 preview is NOT needed for this).
+# fine -- the .NET 11 SDK is NOT needed for this).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"

@@ -96,8 +96,9 @@ releases will usually work, but the notes below call out where a version matters
 ### Hardware / device
 - An **arm64-v8a** or **x86_64** Android device that `adb devices` lists, with
   USB debugging on (a physical phone) or a running emulator. The device serial is
-  passed to every script with `-s <serial>`. We verified on two:
-  a **Pixel 4 XL, Android 13 (API 33)** (arm64-v8a), and a **Google-API x86_64
+  passed to every script with `-s <serial>`. We verified on three:
+  a **Pixel 4 XL, Android 13 (API 33)** (arm64-v8a), a **Samsung Galaxy S20 FE
+  5G (SM-G781U1), Android 13 (API 33)** (arm64-v8a), and a **Google-API x86_64
   emulator, API 37** (`sdk_gphone64_x86_64`). Use a **Google APIs** system image,
   not a Play image — `run-as` (which everything relies on) only works on
   debuggable/Google-API images. The `arm64` and `x86_64` builds are independent,
@@ -114,7 +115,7 @@ releases will usually work, but the notes below call out where a version matters
 - A **`dotnet` on PATH** for the netcoredbg build (a tiny code-gen tool,
   `generrmsg`, is built with `dotnet build`), for the managed helper
   (`build-managed-helper.sh` runs `dotnet publish`), for the DAP probe, and for
-  packing. The **system .NET 10 SDK (10.0.400) is fine**; the .NET 11 preview is
+  packing. The **system .NET 10 SDK (10.0.401) is fine**; the .NET 11 SDK is
   **not** needed for any of that. (Do not confuse this with Part 1, which does
   need .NET 11.)
 
@@ -122,32 +123,49 @@ releases will usually work, but the notes below call out where a version matters
 
 The sample app targets `net11.0-android37.0`, which the shipping .NET 10 workload
 cannot build (it tops out at `net10.0-android36.1`). You need the **.NET 11
-preview SDK plus its `android` workload**, installed **isolated** so it does not
-become the default SDK for everything else on the machine.
+SDK plus its `android` workload** — a release candidate until .NET 11 ships —
+installed **isolated** so it does not become the default SDK for everything
+else on the machine.
 
 Exact versions we used:
 
 | Component            | Version                                   |
 |---------------------|--------------------------------------------|
-| .NET SDK            | `11.0.100-preview.7.26381.103`             |
-| workload set        | `11.0.100-preview.7.26410.2`               |
-| `android` workload  | `37.0.0-preview.7.2131`                    |
+| .NET SDK            | `11.0.100-rc.1.26425.128`                  |
+| workload set        | `11.0.100-rc.1.26458.5`                    |
+| `android` workload  | `37.0.0-rc.1.2257`                         |
 
-Install it (this is the whole setup — no apt packages, no PATH changes):
+Install it (this is the whole setup — no apt packages, no PATH changes). Take
+the **linux-x64 SDK binaries tarball** from the .NET 11 download page
+(https://dotnet.microsoft.com/download/dotnet/11.0) and check its SHA-512
+against the value shown there before extracting:
 
 ```bash
 # 1) SDK into an isolated dir (NEVER /usr/share/dotnet, NEVER on PATH)
-curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin \
-    --channel 11.0 --quality preview --install-dir ~/dotnet11
+sha512sum dotnet-sdk-11.0.100-rc.1.26425.128-linux-x64.tar.gz
+mkdir -p ~/dotnet11
+tar -xzf dotnet-sdk-11.0.100-rc.1.26425.128-linux-x64.tar.gz -C ~/dotnet11
 
 # 2) the Android workload, into that same isolated SDK
 DOTNET_ROOT=$HOME/dotnet11 ~/dotnet11/dotnet workload install android
 ```
 
+The extracted SDK also carries an `sdk-manifests/11.0.100-preview.6` band
+beside the `11.0.100-rc.1` one; that ships inside Microsoft's tarball and is
+needed — it is not a leftover, do not delete it.
+
+**Moving to a newer .NET 11 build** (the next release candidate, or the final
+release): `rm -rf ~/dotnet11`, extract the new tarball into a fresh
+`~/dotnet11`, and run the workload install again — the folder is the whole
+install. The old build leaves harmless traces outside the folder that you may
+purge: its versions under `~/.nuget/packages/microsoft.net.illink.tasks/` and
+`~/.nuget/packages/microsoft.netcore.app.runtime.android-*/`, and the sample
+app's `bin/` and `obj/`, which must be rebuilt against the new SDK anyway.
+
 **Isolation rules (do not skip — this is the safety mechanism):**
 - Install to `~/dotnet11`, not `/usr/share/dotnet` (that tree is dpkg-owned).
 - **Never put `~/dotnet11` on `PATH`.** Outside Visual Studio the SDK resolver
-  considers prerelease versions, so a preview on PATH silently becomes the
+  considers prerelease versions, so a prerelease on PATH silently becomes the
   default SDK for every repo that doesn't pin one.
 - Always invoke it by absolute path with `DOTNET_ROOT` set:
   `DOTNET_ROOT=$HOME/dotnet11 ~/dotnet11/dotnet <args>`.
@@ -157,7 +175,7 @@ Verify the isolation held (safe, read-only):
 
 ```bash
 ~/dotnet11/dotnet --list-sdks   # expect 11.0.x under /home/<you>/dotnet11/sdk
-dotnet --list-sdks              # expect ONLY your system SDK (e.g. 10.0.400)
+dotnet --list-sdks              # expect ONLY your system SDK (e.g. 10.0.401)
 ```
 
 If the second command lists an `11.x`, the isolation leaked — fix that first.
@@ -174,7 +192,9 @@ If the second command lists an `11.x`, the isolation leaked — fix that first.
   referenced (see Part 6). In the IDE, File > Options > General needs BOTH
   "Additional SDK installation folders" (= `/home/<you>/dotnet11`) and "Allow
   preview MSBuild" — the folder says where the .NET 11 SDK is, the checkbox
-  grants permission to use a preview.
+  grants permission to use a prerelease SDK. A release candidate still counts
+  as prerelease (its version carries a suffix), so the checkbox stays required
+  until a stable .NET 11 SDK is the newest one installed.
 
 ---
 
@@ -196,7 +216,7 @@ and install straight to the device in one step (`-t:Install`):
 ```bash
 DOTNET_ROOT=$HOME/dotnet11 $HOME/dotnet11/dotnet \
   build -c Debug -t:Install -p:AdbTarget="-s <serial>" ./SimpleDebugApp.csproj
-adb -s <serial> shell am start -n com.codebrix.simpledebugapp/.MainActivity
+adb -s <serial> shell am start -n com.codebrix.simpledebugapp_net11/.MainActivity
 ```
 
 Notes:
@@ -216,13 +236,13 @@ Notes:
 Verify it really is a Debug build **on the device** (all three should hold; swap
 `arm64-v8a`→`x86_64` and `arm64`→`x86_64` on an x64 device):
 
-- `adb -s <serial> shell dumpsys package com.codebrix.simpledebugapp | grep flags`
+- `adb -s <serial> shell dumpsys package com.codebrix.simpledebugapp_net11 | grep flags`
   shows `DEBUGGABLE`.
-- `adb -s <serial> shell run-as com.codebrix.simpledebugapp ls files/.__override__/arm64-v8a/`
+- `adb -s <serial> shell run-as com.codebrix.simpledebugapp_net11 ls files/.__override__/arm64-v8a/`
   contains loose `.dll` files **and** `SimpleDebugApp.pdb` (Debug deploys
   assemblies as files, not embedded in the APK).
 - The running process maps `libcoreclr.so` (CoreCLR), not `libmonosgen` (Mono):
-  `adb -s <serial> shell run-as com.codebrix.simpledebugapp cat /proc/$(adb -s <serial> shell pidof com.codebrix.simpledebugapp)/maps | grep -o 'lib\(coreclr\|monosgen\)[^ ]*'`.
+  `adb -s <serial> shell run-as com.codebrix.simpledebugapp_net11 cat /proc/$(adb -s <serial> shell pidof com.codebrix.simpledebugapp_net11)/maps | grep -o 'lib\(coreclr\|monosgen\)[^ ]*'`.
 
 `.NET 10` Android apps run on MonoVM, which this debugger cannot attach to; only
 `.NET 11` (CoreCLR) is debuggable here. Keep the app at `net11.0-android37.0`.
@@ -491,7 +511,7 @@ refuses `.NET 10` and older (MonoVM) with the runtime explanation.
   the emulator (device chosen through the remembered-device preference the
   picker writes): expand the project, open `MainActivity.cs`, F9 on line 47,
   F5 — Application Output shows every step of the pipeline and "Attached to
-  com.codebrix.simpledebugapp (process …)"; tapping Count on the device
+  com.codebrix.simpledebugapp_net11 (process …)"; tapping Count on the device
   highlights line 47 and fills the Call Stack pad; hovering `_count` shows
   `_count = 1`; F10 moves the execution marker to line 48; Shift+F5 ends with
   "Debugging ended" and the device clean.
@@ -666,8 +686,9 @@ arm64-v8a **and** an x86_64 device, expect `>>> ALL CHECKS PASSED` on both, then
 
 # Reference — how it works, and the Android specifics
 
-Verified on a Pixel 4 XL (Android 13 / API 33, arm64-v8a) and a Google-API x86_64
-emulator (API 37), against `com.codebrix.simpledebugapp` (`net11.0-android37.0`).
+Verified on a Pixel 4 XL and a Samsung Galaxy S20 FE 5G (both Android 13 / API 33,
+arm64-v8a) and a Google-API x86_64 emulator (API 37), against
+`com.codebrix.simpledebugapp_net11` (`net11.0-android37.0`).
 This is the minimum a future session needs to understand, extend, or maintain
 the pieces above. Paths below use the arm64 ABI names; on x86_64 substitute the
 ABI (see "Two ABI naming conventions" in the device fact sheet).
@@ -793,7 +814,7 @@ last-seen id instead of `MT_SessionAccept` (fact 2).
 
 ## Device fact sheet
 
-- Debuggee package `com.codebrix.simpledebugapp`, activity `.MainActivity`
+- Debuggee package `com.codebrix.simpledebugapp_net11`, activity `.MainActivity`
   (the IDE resolves the launcher activity of any package with
   `cmd package resolve-activity --brief <pkg>`, last line).
 - Debugger dir on device: `/data/data/<pkg>/ncdbg/` (the scripts push to

@@ -7,7 +7,7 @@
     android/README.md). It is NOT the IDE's client and shares no code with it:
     a problem it finds is a transport-or-debugger problem, not an IDE one.
 
-    Build/run with the SYSTEM .NET SDK (10.0.x); the .NET 11 preview is not
+    Build/run with the SYSTEM .NET SDK (10.0.x); the .NET 11 SDK is not
     needed. scripts/run-dap-session.sh runs it for you.
   -->
 
